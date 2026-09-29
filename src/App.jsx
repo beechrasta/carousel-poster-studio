@@ -12,7 +12,7 @@ import ExportProgressModal from './components/ExportProgressModal';
 import BackgroundTaskBar from './components/BackgroundTaskBar';
 
 import { ensureFontsReady, POSTER_THEMES, THEME_KEYS } from './utils/canvasRenderer';
-import { downloadDeckAsZIP, exportProjectJSON } from './utils/exportEngine';
+import { saveSlidesToFolder } from './utils/exportEngine';
 import { 
   DEFAULT_SETTINGS, 
   checkOpencodeStatus, 
@@ -835,62 +835,46 @@ export default function App() {
     setCurrentView('studio');
   };
 
-  // ZIP Export
-  const handleExportZIP = async () => {
+  // Save all slides to a user-chosen folder
+  const handleSaveAllFrames = async () => {
     if (!slides.length) return;
     try {
       setZipProgress({ current: 0, total: slides.length, percent: 0 });
-      await downloadDeckAsZIP(slides, (progress) => {
-        setZipProgress(progress);
-      }, globalSettings);
-      showToast(`ZIP exported with ${slides.length} high-res posters!`);
+      const result = await saveSlidesToFolder(
+        slides,
+        null, // all slides
+        globalSettings,
+        (progress) => setZipProgress(progress)
+      );
+      if (!result.cancelled) {
+        showToast(`Saved ${result.saved} frames!`);
+      }
     } catch (err) {
-      showToast('ZIP export failed: ' + err.message);
+      showToast('Save failed: ' + err.message);
     } finally {
       setTimeout(() => setZipProgress(null), 600);
     }
   };
 
-  // JSON Import
-  const handleImportJSON = (file) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      try {
-        const data = JSON.parse(reader.result);
-        if (!data || !Array.isArray(data.slides) || !data.slides.length) {
-          throw new Error('JSON does not contain a valid slides array.');
-        }
-        const validated = data.slides.map(s => ({
-          id: s.id || uid(),
-          headline: s.headline || '',
-          subtext: s.subtext || '',
-          image: s.image || null,
-          fit: s.fit || 'cover',
-          focal: s.focal != null ? s.focal : 50,
-          credit: s.credit || '',
-          fontChoice: s.fontChoice || 'Anton',
-          themeId: s.themeId || 'dark_lime',
-          customBgColor: s.customBgColor,
-          customAccentColor: s.customAccentColor,
-          customHeadlineColor: s.customHeadlineColor,
-          customSubtextColor: s.customSubtextColor,
-        }));
-
-        const importedProjName = file.name.replace(/\.json$/i, '') || 'Imported Project';
-        const newProj = createProject(importedProjName, validated);
-        if (data.globalSettings) {
-          newProj.globalSettings = data.globalSettings;
-          saveCurrentProject(newProj);
-        }
-        setProjects(getAllProjects());
-        setActiveId(newProj.id);
-        setCurrentView('studio');
-        showToast(`Imported "${importedProjName}" with ${validated.length} slides.`);
-      } catch (err) {
-        showToast('JSON import failed: ' + err.message);
+  // Save only the current slide
+  const handleSaveCurrentFrame = async () => {
+    if (!currentSlide) return;
+    try {
+      setZipProgress({ current: 0, total: 1, percent: 0 });
+      const result = await saveSlidesToFolder(
+        slides,
+        [currentIndex],
+        globalSettings,
+        (progress) => setZipProgress(progress)
+      );
+      if (!result.cancelled) {
+        showToast(`Saved slide ${currentIndex + 1}!`);
       }
-    };
-    reader.readAsText(file);
+    } catch (err) {
+      showToast('Save failed: ' + err.message);
+    } finally {
+      setTimeout(() => setZipProgress(null), 600);
+    }
   };
 
   const currentSlide = slides[currentIndex] || slides[0];
@@ -910,10 +894,9 @@ export default function App() {
         onOpenNewsGenerator={() => setIsNewsOpen(true)}
         onOpenGlobalSettings={handleOpenGlobalSettings}
         onOpenSettings={() => setIsSettingsOpen(true)}
-        onExportJSON={() => exportProjectJSON({ slides, current: currentIndex, globalSettings })}
-        onImportJSON={handleImportJSON}
-        onExportZIP={handleExportZIP}
-        isGeneratingZIP={zipProgress !== null}
+        onSaveAllFrames={handleSaveAllFrames}
+        onSaveCurrentFrame={handleSaveCurrentFrame}
+        isSaving={zipProgress !== null}
         opencodeAvailable={opencodeAvailable}
         canUndo={undoStack.length > 0}
         canRedo={redoStack.length > 0}

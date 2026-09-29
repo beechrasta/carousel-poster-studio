@@ -1,4 +1,3 @@
-import JSZip from 'jszip';
 import { renderSlideToCanvas } from './canvasRenderer';
 
 /**
@@ -61,57 +60,68 @@ export async function copySlideToClipboard(slide, slideIndex, globalSettings = n
 }
 
 /**
- * Exports all deck slides as a ZIP archive of 1080x1080 PNGs.
- * @param {Array} slides - Array of slide objects
- * @param {Function} onProgress - Progress callback ({ current, total, percent })
- * @param {Object} [globalSettings] - Optional global project settings
+ * Saves selected (or all) deck slides as 1080x1080 PNGs into a user-chosen folder.
+ * Uses the File System Access API (showDirectoryPicker). Falls back to sequential
+ * browser-download links if the API is unavailable.
+ *
+ * @param {Array}    slides         - All slide objects in the deck
+ * @param {number[]|null} selectedIndices - Indices to export, or null to export all
+ * @param {Object}   globalSettings - Project global settings
+ * @param {Function} onProgress     - Progress callback ({ current, total, percent })
  */
-export async function downloadDeckAsZIP(slides, onProgress = () => {}, globalSettings = null) {
-  const zip = new JSZip();
-  const total = slides.length;
+export async function saveSlidesToFolder(
+  slides,
+  selectedIndices = null,
+  globalSettings = null,
+  onProgress = () => {}
+) {
+  const indices = selectedIndices ?? slides.map((_, i) => i);
+  const total = indices.length;
 
-  for (let i = 0; i < total; i++) {
-    onProgress({ current: i + 1, total, percent: Math.round(((i + 0.5) / total) * 100) });
-    const canvas = await renderSlideToCanvas(slides[i], i, null, globalSettings, total);
-    const blob = await canvasToBlob(canvas);
-    const filename = `slide-${String(i + 1).padStart(2, '0')}.png`;
-    zip.file(filename, blob);
-    onProgress({ current: i + 1, total, percent: Math.round(((i + 1) / total) * 100) });
+  // --- Native File System Access API path ---
+  if (typeof window.showDirectoryPicker === 'function') {
+    let dirHandle;
+    try {
+      dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+    } catch (err) {
+      // User cancelled the picker
+      if (err.name === 'AbortError') return { cancelled: true };
+      throw err;
+    }
+
+    for (let n = 0; n < total; n++) {
+      const i = indices[n];
+      onProgress({ current: n + 1, total, percent: Math.round(((n + 0.5) / total) * 100) });
+
+      const canvas = await renderSlideToCanvas(slides[i], i, null, globalSettings, slides.length);
+      const blob = await canvasToBlob(canvas);
+      const filename = `slide-${String(i + 1).padStart(2, '0')}.png`;
+
+      const fileHandle = await dirHandle.getFileHandle(filename, { create: true });
+      const writable = await fileHandle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+
+      onProgress({ current: n + 1, total, percent: Math.round(((n + 1) / total) * 100) });
+    }
+
+    return { saved: total, cancelled: false };
   }
 
-  // Also include project JSON backup inside the ZIP
-  const projectBackup = {
-    appName: 'Carousel Poster Studio',
-    version: '1.0.0',
-    exportedAt: new Date().toISOString(),
-    globalSettings,
-    slides,
-  };
-  zip.file('project-data.json', JSON.stringify(projectBackup, null, 2));
+  // --- Fallback: sequential browser downloads ---
+  for (let n = 0; n < total; n++) {
+    const i = indices[n];
+    onProgress({ current: n + 1, total, percent: Math.round(((n + 0.5) / total) * 100) });
+    const canvas = await renderSlideToCanvas(slides[i], i, null, globalSettings, slides.length);
+    const blob = await canvasToBlob(canvas);
+    const filename = `slide-${String(i + 1).padStart(2, '0')}.png`;
+    downloadBlob(blob, filename);
+    // Small delay between downloads so browsers don't block them
+    if (n < total - 1) await new Promise(r => setTimeout(r, 400));
+    onProgress({ current: n + 1, total, percent: Math.round(((n + 1) / total) * 100) });
+  }
 
-  const zipBlob = await zip.generateAsync({
-    type: 'blob',
-    compression: 'DEFLATE',
-    compressionOptions: { level: 6 }
-  });
-
-  downloadBlob(zipBlob, 'carousel-posters.zip');
-}
-
-/**
- * Exports project as portable JSON file.
- */
-export function exportProjectJSON(state) {
-  const payload = {
-    appName: 'Carousel Poster Studio',
-    version: '1.0.0',
-    savedAt: new Date().toISOString(),
-    globalSettings: state.globalSettings,
-    slides: state.slides,
-    current: state.current,
-  };
-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-  downloadBlob(blob, 'carousel-poster-project.json');
+  return { saved: total, cancelled: false };
 }
 
 /**

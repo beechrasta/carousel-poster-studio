@@ -2,11 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { 
   Sparkles, 
   Settings, 
-  FileDown, 
-  Upload, 
-  Archive, 
   Layers, 
-  Plus, 
   Zap,
   Terminal,
   FolderKanban,
@@ -21,7 +17,8 @@ import {
   RotateCcw,
   Trash2,
   SlidersHorizontal,
-  MoreVertical
+  FolderOutput,
+  ImageDown,
 } from 'lucide-react';
 
 export default function Header({
@@ -36,10 +33,9 @@ export default function Header({
   onOpenNewsGenerator,
   onOpenGlobalSettings,
   onOpenSettings,
-  onExportJSON,
-  onImportJSON,
-  onExportZIP,
-  isGeneratingZIP,
+  onSaveCurrentFrame,   // saves single current slide to folder
+  onSaveAllFrames,      // saves all slides to folder
+  isSaving,             // bool: export in progress
   opencodeAvailable,
   canUndo = false,
   canRedo = false,
@@ -48,28 +44,18 @@ export default function Header({
   onResetPreferences,
   onResetDeckToBlank,
 }) {
-  const fileInputRef = useRef(null);
-  const [showJsonMenu, setShowJsonMenu] = useState(false);
-  const jsonMenuRef = useRef(null);
+  const [showActionsMenu, setShowActionsMenu] = useState(false);
+  const actionsMenuRef = useRef(null);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
-      if (jsonMenuRef.current && !jsonMenuRef.current.contains(e.target)) {
-        setShowJsonMenu(false);
+      if (actionsMenuRef.current && !actionsMenuRef.current.contains(e.target)) {
+        setShowActionsMenu(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-
-  const handleFileChange = (e) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      onImportJSON(file);
-      e.target.value = '';
-      setShowJsonMenu(false);
-    }
-  };
 
   return (
     <header className="studio-header">
@@ -142,6 +128,7 @@ export default function Header({
           <span className="badge badge-dim" title={`${slidesCount} slides in current deck`}>
             <Layers size={11} className="badge-icon" />
             <strong className="badge-num">{slidesCount}</strong>
+            <span style={{ fontSize: 9, color: 'var(--text-muted)' }}>slides</span>
           </span>
           <span className="badge badge-accent" title="Canvas Resolution: 1080 x 1080 px">
             1080&times;1080
@@ -187,7 +174,7 @@ export default function Header({
         )}
       </div>
 
-      {/* Right Section: Theme Toggle, Settings, Actions Dropdown & Export ZIP */}
+      {/* Right Section: Theme Toggle, Settings, Actions Dropdown & Save Frames */}
       <div className="header-right">
         {/* Light / Dark Mode Toggle */}
         <button 
@@ -208,49 +195,27 @@ export default function Header({
           <span>Settings</span>
         </button>
 
-        {/* Actions & JSON Dropdown Menu */}
-        <div className="relative" ref={jsonMenuRef} style={{ position: 'relative' }}>
+        {/* Actions Dropdown: Reset only */}
+        <div className="relative" ref={actionsMenuRef} style={{ position: 'relative' }}>
           <button 
             className="btn btn-secondary btn-sm"
-            onClick={() => setShowJsonMenu(!showJsonMenu)}
-            title="Deck Actions, JSON Export/Import &amp; Reset Preferences"
+            onClick={() => setShowActionsMenu(!showActionsMenu)}
+            title="Deck Actions &amp; Reset Preferences"
           >
             <SlidersHorizontal size={13} />
             <span>Actions</span>
             <ChevronDown size={11} className="text-muted" />
           </button>
 
-          {showJsonMenu && (
+          {showActionsMenu && (
             <div className="header-dropdown-menu">
-              <div className="dropdown-section-label">PROJECT FILE</div>
-              <button 
-                className="dropdown-item"
-                onClick={() => {
-                  onExportJSON();
-                  setShowJsonMenu(false);
-                }}
-              >
-                <FileDown size={13} />
-                <span>Export Project JSON</span>
-              </button>
-              <button 
-                className="dropdown-item"
-                onClick={() => {
-                  fileInputRef.current?.click();
-                }}
-              >
-                <Upload size={13} />
-                <span>Import Project JSON</span>
-              </button>
-
-              <div className="dropdown-divider"></div>
               <div className="dropdown-section-label">RESET &amp; CLEAR</div>
 
               <button 
                 className="dropdown-item"
                 onClick={() => {
                   if (onResetPreferences) onResetPreferences();
-                  setShowJsonMenu(false);
+                  setShowActionsMenu(false);
                 }}
                 title="Reset all themes, templates, watermarks, and typography back to defaults"
               >
@@ -263,7 +228,7 @@ export default function Header({
                 onClick={() => {
                   if (confirm('Clear the entire deck and start fresh with 1 blank slide? (You can undo with Ctrl+Z)')) {
                     if (onResetDeckToBlank) onResetDeckToBlank();
-                    setShowJsonMenu(false);
+                    setShowActionsMenu(false);
                   }
                 }}
                 title="Clear all slides and start fresh with 1 blank slide"
@@ -274,25 +239,30 @@ export default function Header({
             </div>
           )}
         </div>
-        <input 
-          ref={fileInputRef} 
-          type="file" 
-          accept="application/json" 
-          style={{ display: 'none' }} 
-          onChange={handleFileChange} 
-        />
 
-        {/* Primary ZIP Export Button */}
+        {/* Save Current Frame */}
         <button 
-          className="btn btn-primary btn-zip"
-          onClick={onExportZIP}
-          disabled={isGeneratingZIP || slidesCount === 0}
-          title="Download all slides as high-res 1080x1080 PNGs in a ZIP"
+          className="btn btn-secondary btn-sm"
+          onClick={onSaveCurrentFrame}
+          disabled={isSaving || slidesCount === 0}
+          title="Save this slide as PNG — pick where to save it"
         >
-          <Archive size={14} />
-          <span>{isGeneratingZIP ? 'Exporting...' : 'Download ZIP'}</span>
+          <ImageDown size={14} />
+          <span>{isSaving ? 'Saving...' : 'Save Frame'}</span>
+        </button>
+
+        {/* Save All Frames (primary action) */}
+        <button 
+          className="btn btn-primary btn-save-frames"
+          onClick={onSaveAllFrames}
+          disabled={isSaving || slidesCount === 0}
+          title="Save all slides as PNGs — choose a folder"
+        >
+          <FolderOutput size={14} />
+          <span>{isSaving ? 'Saving...' : `Save All (${slidesCount})`}</span>
         </button>
       </div>
     </header>
   );
 }
+

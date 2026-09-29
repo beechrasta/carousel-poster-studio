@@ -1,5 +1,5 @@
 import React from 'react';
-import { Archive, Loader2 } from 'lucide-react';
+import { FolderOutput } from 'lucide-react';
 
 export default function ExportProgressModal({ isOpen, progress }) {
   if (!isOpen) return null;
@@ -13,12 +13,12 @@ export default function ExportProgressModal({ isOpen, progress }) {
       <div className="modal-container progress-export-modal" onClick={(e) => e.stopPropagation()}>
         <div className="export-progress-content">
           <div className="progress-spinner-wrap">
-            <Archive size={32} className="text-lime animate-bounce" />
+            <FolderOutput size={32} className="text-lime animate-bounce" />
           </div>
           
-          <h3 className="text-lg font-bold text-white mt-3">Exporting Carousel Deck</h3>
+          <h3 className="text-lg font-bold text-white mt-3">Saving Frames</h3>
           <p className="text-sm text-muted mt-1">
-            Rendering high-resolution 1080x1080 PNGs ({current} of {total})
+            Rendering high-resolution 1080×1080 PNGs ({current} of {total})
           </p>
 
           <div className="progress-track mt-4">
@@ -34,3 +34,4 @@ export default function ExportProgressModal({ isOpen, progress }) {
     </div>
   );
 }
+
