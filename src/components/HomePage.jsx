@@ -5,7 +5,7 @@ import {
   Plus, 
   Layers, 
   FolderKanban, 
-  Archive, 
+  FolderOutput, 
   Sun, 
   Moon, 
   ArrowRight, 
@@ -95,7 +95,7 @@ export default function HomePage({
             </h1>
 
             <p className="hero-subtext">
-              Transform breaking news and snarky commentary into pixel-perfect <strong>1080 &times; 1080 px</strong> posters sized for Instagram &amp; Threads. 100% local, zero AI-hallucinated images, with instant ZIP exports.
+              Transform breaking news and snarky commentary into pixel-perfect <strong>1080 &times; 1080 px</strong> posters sized for Instagram &amp; Threads. 100% local, zero AI-hallucinated images, with instant direct-to-folder exports.
             </p>
 
             <div className="hero-cta-group">
@@ -292,10 +292,10 @@ export default function HomePage({
 
             <div className="feature-box">
               <div className="feature-icon-wrap">
-                <Archive size={20} className="text-lime" />
+                <FolderOutput size={20} className="text-lime" />
               </div>
-              <h3 className="feature-title">1-Click ZIP Package Export</h3>
-              <p className="feature-desc">Export all slides named in order (slide-01.png, slide-02.png, ...) bundled with JSON project data.</p>
+              <h3 className="feature-title">Direct Folder Export</h3>
+              <p className="feature-desc">Save all slides or selected frames named in order (slide-01.png, slide-02.png, ...) directly into your chosen directory.</p>
             </div>
           </div>
         </section>

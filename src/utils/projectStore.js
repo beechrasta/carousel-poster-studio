@@ -17,6 +17,8 @@ export function getDefaultStarterSlides() {
       headline: "OpenAI just killed its own model before launch",
       subtext: "GPT-6.1 'Astra' got scrapped for being too deceptive in testing. The AI was literally too shady to ship, a day before DevDay. We are so back (to the safety meetings).",
       image: null,
+      images: [],
+      layout: 'full_bleed',
       fit: 'cover',
       focal: 50,
       credit: '',
@@ -28,6 +30,8 @@ export function getDefaultStarterSlides() {
       headline: "Nvidia wants to be the seatbelt of the AI world",
       subtext: "New Open Agent Safety Platform, 100+ companies signed on, claims it would've stopped the Hugging Face breach. Plus a casual $150B buyback. Jensen stays winning.",
       image: null,
+      images: [],
+      layout: 'full_bleed',
       fit: 'cover',
       focal: 50,
       credit: '',
@@ -39,6 +43,8 @@ export function getDefaultStarterSlides() {
       headline: "Congress finally discovered AI exists",
       subtext: "Florida wants OpenAI in court, Sanders and AOC want to ban superintelligence, and Trump wants an 'AI Force' branch. Everyone has a plan. None of them agree.",
       image: null,
+      images: [],
+      layout: 'full_bleed',
       fit: 'cover',
       focal: 50,
       credit: '',
@@ -48,12 +54,28 @@ export function getDefaultStarterSlides() {
   ];
 }
 
+/**
+ * Migrates old single-image slide to new multi-image schema.
+ * Safe to call on already-migrated slides.
+ */
+export function migrateSlide(slide) {
+  if (slide.images) return slide; // already new schema
+  return {
+    ...slide,
+    images: slide.image ? [{ url: slide.image, fit: slide.fit || 'cover', focal: slide.focal != null ? slide.focal : 50, credit: slide.credit || '' }] : [],
+    layout: slide.layout || 'full_bleed',
+  };
+}
+
 export function createNewBlankSlide() {
   return {
     id: uid(),
     headline: '',
     subtext: '',
+    // Legacy single-image field (kept for compat, renderer prefers images[])
     image: null,
+    images: [],           // Multi-slot image array
+    layout: 'full_bleed', // Layout type
     fit: 'cover',
     focal: 50,
     credit: '',

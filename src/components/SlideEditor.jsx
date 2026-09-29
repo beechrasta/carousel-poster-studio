@@ -18,15 +18,19 @@ import {
   RotateCcw,
   Zap,
   Layout,
-  Stamp
+  Stamp,
+  Search,
+  Plus,
 } from 'lucide-react';
 import DeckGlobalEditor from './DeckGlobalEditor';
+import ImagePickerModal from './ImagePickerModal';
 import { fileToDataURL, urlToDataURL } from '../utils/exportEngine';
 import { 
   POSTER_THEMES, 
   resolveSlideTheme, 
   resolveFrameLabel, 
-  POSTER_LAYOUT_TEMPLATES 
+  POSTER_LAYOUT_TEMPLATES,
+  SLIDE_LAYOUTS,
 } from '../utils/canvasRenderer';
 
 export default function SlideEditor({
@@ -54,10 +58,56 @@ export default function SlideEditor({
   const activeTab = onSetEditorTab ? editorTab : internalTab;
   const setTab = onSetEditorTab ? onSetEditorTab : setInternalTab;
 
-  const [imageUrlInput, setImageUrlInput] = useState('');
-  const [isFetchingUrl, setIsFetchingUrl] = useState(false);
-  const [dragOver, setDragOver] = useState(false);
   const [showCustomColors, setShowCustomColors] = useState(false);
+  // Image Picker Modal state
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerSlot, setPickerSlot] = useState(0); // which images[] index we're editing
+
+  // Derived: active layout config
+  const activeLayout = SLIDE_LAYOUTS[slide.layout || 'full_bleed'] || SLIDE_LAYOUTS.full_bleed;
+  const imageSlots = activeLayout.imageSlots;
+
+  // Helper: get images[] array, normalizing legacy single-image
+  const getImages = () => {
+    if (slide.images && slide.images.length > 0) return slide.images;
+    if (slide.image) return [{ url: slide.image, fit: slide.fit || 'cover', focal: slide.focal != null ? slide.focal : 50, credit: slide.credit || '' }];
+    return [];
+  };
+
+  // Update a specific image slot
+  const handleSetSlotImage = (slotIdx, url, credit = '') => {
+    const imgs = [...getImages()];
+    while (imgs.length <= slotIdx) imgs.push({ url: null, fit: 'cover', focal: 50, credit: '' });
+    imgs[slotIdx] = { ...imgs[slotIdx], url, credit: credit || imgs[slotIdx]?.credit || '' };
+    onUpdateSlide(slideIndex, { images: imgs, image: imgs[0]?.url || null });
+    showToast('Image attached.');
+  };
+
+  const handleRemoveSlotImage = (slotIdx) => {
+    const imgs = [...getImages()];
+    if (imgs[slotIdx]) imgs[slotIdx] = { ...imgs[slotIdx], url: null, credit: '' };
+    onUpdateSlide(slideIndex, { images: imgs, image: imgs[0]?.url || null });
+    showToast('Image removed.');
+  };
+
+  const handleUpdateSlotFocal = (slotIdx, val) => {
+    const imgs = [...getImages()];
+    while (imgs.length <= slotIdx) imgs.push({ url: null, fit: 'cover', focal: 50, credit: '' });
+    imgs[slotIdx] = { ...imgs[slotIdx], focal: val };
+    onUpdateSlide(slideIndex, { images: imgs });
+  };
+
+  const handleUpdateSlotCredit = (slotIdx, val) => {
+    const imgs = [...getImages()];
+    while (imgs.length <= slotIdx) imgs.push({ url: null, fit: 'cover', focal: 50, credit: '' });
+    imgs[slotIdx] = { ...imgs[slotIdx], credit: val };
+    onUpdateSlide(slideIndex, { images: imgs });
+  };
+
+  const openPicker = (slotIdx) => {
+    setPickerSlot(slotIdx);
+    setPickerOpen(true);
+  };
 
   if (!slide) {
     return (
@@ -359,122 +409,115 @@ export default function SlideEditor({
               )}
             </div>
 
-            {/* Section 1: Image Panel Settings */}
+            {/* Section 1: Layout + Images */}
             <div className="editor-section">
               <div className="section-title">
-                <ImageIcon size={14} className="text-accent" />
-                <span>IMAGE ATTACHMENT</span>
+                <Layout size={14} className="text-accent" />
+                <span>LAYOUT &amp; IMAGES</span>
               </div>
 
-              {slide.image ? (
-                <div className="attached-image-container">
-                  <div className="image-preview-card">
-                    <img src={slide.image} alt="Slide preview" className="attached-img-thumb" />
-                    <button 
-                      className="btn-remove-img"
-                      onClick={() => onUpdateSlide(slideIndex, { image: null })}
-                      title="Remove Image"
-                    >
-                      <Trash2 size={13} />
-                      <span>Remove</span>
-                    </button>
-                  </div>
+              {/* Layout Picker */}
+              <div className="layout-picker-grid">
+                {Object.values(SLIDE_LAYOUTS).map(layout => (
+                  <button
+                    key={layout.id}
+                    className={`layout-pick-card ${(slide.layout || 'full_bleed') === layout.id ? 'active' : ''}`}
+                    onClick={() => {
+                      onUpdateSlide(slideIndex, { layout: layout.id });
+                      showToast(`Layout: ${layout.name}`);
+                    }}
+                    title={layout.desc}
+                  >
+                    <span className="layout-pick-icon">{layout.icon}</span>
+                    <span className="layout-pick-name">{layout.name}</span>
+                    {layout.imageSlots > 0 && (
+                      <span className="layout-pick-slots">{layout.imageSlots} photo{layout.imageSlots > 1 ? 's' : ''}</span>
+                    )}
+                  </button>
+                ))}
+              </div>
 
-                  {/* Fit Toggle */}
-                  <div className="input-group">
-                    <label className="input-label">Image Fit Mode</label>
-                    <div className="toggle-pill-group">
-                      <button 
-                        className={`pill-btn ${(!slide.fit || slide.fit === 'cover') ? 'active' : ''}`}
-                        onClick={() => onUpdateSlide(slideIndex, { fit: 'cover' })}
-                      >
-                        Cover (Crop Fill)
-                      </button>
-                      <button 
-                        className={`pill-btn ${slide.fit === 'contain' ? 'active' : ''}`}
-                        onClick={() => onUpdateSlide(slideIndex, { fit: 'contain' })}
-                      >
-                        Contain (Full Image)
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Focal Point Slider */}
-                  {(!slide.fit || slide.fit === 'cover') && (
-                    <div className="input-group">
-                      <div className="label-with-value">
-                        <label className="input-label">Vertical Focal Point</label>
-                        <span className="value-tag">{slide.focal != null ? slide.focal : 50}%</span>
-                      </div>
-                      <input 
-                        type="range" 
-                        min="0" 
-                        max="100" 
-                        value={slide.focal != null ? slide.focal : 50}
-                        onChange={(e) => onUpdateSlide(slideIndex, { focal: parseInt(e.target.value, 10) })}
-                        className="slider-input"
-                      />
-                      <div className="slider-hints">
-                        <span>0% (Top)</span>
-                        <span>50% (Center)</span>
-                        <span>100% (Bottom)</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Image Credit */}
-                  <div className="input-group">
-                    <label className="input-label">Image Credit / Source</label>
-                    <input 
-                      type="text" 
-                      value={slide.credit || ''} 
-                      placeholder="e.g. Photo: OpenAI / TechCrunch"
-                      onChange={(e) => onUpdateSlide(slideIndex, { credit: e.target.value })}
-                      className="text-input"
-                    />
-                  </div>
+              {/* Image Slots */}
+              {imageSlots === 0 ? (
+                <div className="img-slot-notice">
+                  <ImageIcon size={14} className="text-muted" />
+                  <span className="text-xs text-muted">This layout uses no images — pure typography.</span>
                 </div>
               ) : (
-                <div className="image-uploader-block">
-                  {/* Drop Zone */}
-                  <label 
-                    className={`drop-zone ${dragOver ? 'drag-over' : ''}`}
-                    onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-                    onDragLeave={() => setDragOver(false)}
-                    onDrop={handleDrop}
-                  >
-                    <Upload size={22} className="upload-icon" />
-                    <span className="drop-main-text">Upload Image File</span>
-                    <span className="drop-sub-text">Drag & drop or click to browse</span>
-                    <input 
-                      type="file" 
-                      accept="image/*" 
-                      onChange={handleFileUpload} 
-                      style={{ display: 'none' }} 
-                    />
-                  </label>
+                <div className="img-slots-list">
+                  {Array.from({ length: imageSlots }).map((_, slotIdx) => {
+                    const imgs = getImages();
+                    const slot = imgs[slotIdx];
+                    const hasImg = !!slot?.url;
+                    const slotLabel = imageSlots === 1 ? 'Background Image' :
+                      slotIdx === 0 ? 'Primary Image' :
+                      slotIdx === 1 ? 'Secondary Image' : `Image ${slotIdx + 1}`;
+                    return (
+                      <div key={slotIdx} className="img-slot-card">
+                        <div className="img-slot-header">
+                          <span className="text-xs font-semibold text-pure">{slotLabel}</span>
+                          {hasImg && (
+                            <button
+                              className="btn-remove-img-xs"
+                              onClick={() => handleRemoveSlotImage(slotIdx)}
+                              title="Remove image"
+                            >
+                              <Trash2 size={11} /> Remove
+                            </button>
+                          )}
+                        </div>
 
-                  {/* URL Input */}
-                  <div className="url-attach-row">
-                    <div className="url-input-wrapper">
-                      <LinkIcon size={14} className="url-icon" />
-                      <input 
-                        type="url" 
-                        value={imageUrlInput}
-                        placeholder="Or paste internet image URL (https://...)"
-                        onChange={(e) => setImageUrlInput(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleAttachUrl()}
-                        className="url-input"
-                      />
-                    </div>
-                    <button 
-                      className="btn btn-secondary btn-sm"
-                      onClick={handleAttachUrl}
-                      disabled={isFetchingUrl || !imageUrlInput.trim()}
-                    >
-                      {isFetchingUrl ? 'Fetching...' : 'Attach'}
-                    </button>
-                  </div>
+                        {hasImg ? (
+                          <div className="img-slot-filled">
+                            <img
+                              src={slot.url}
+                              alt="slot"
+                              className="img-slot-thumb"
+                              crossOrigin="anonymous"
+                            />
+                            <button
+                              className="img-slot-change-btn"
+                              onClick={() => openPicker(slotIdx)}
+                            >
+                              <Search size={12} /> Change Photo
+                            </button>
+                            {/* Focal point slider */}
+                            <div className="input-group mt-1">
+                              <div className="label-with-value">
+                                <label className="input-label">Focal Point</label>
+                                <span className="value-tag">{slot.focal != null ? slot.focal : 50}%</span>
+                              </div>
+                              <input
+                                type="range"
+                                min="0" max="100"
+                                value={slot.focal != null ? slot.focal : 50}
+                                onChange={e => handleUpdateSlotFocal(slotIdx, parseInt(e.target.value, 10))}
+                                className="slider-input"
+                              />
+                            </div>
+                            <div className="input-group mt-1">
+                              <input
+                                type="text"
+                                className="text-input text-xs"
+                                value={slot.credit || ''}
+                                placeholder="Photo credit..."
+                                onChange={e => handleUpdateSlotCredit(slotIdx, e.target.value)}
+                              />
+                            </div>
+                          </div>
+                        ) : (
+                          <button
+                            className="img-slot-empty"
+                            onClick={() => openPicker(slotIdx)}
+                          >
+                            <Search size={18} className="text-accent" />
+                            <span className="text-sm text-pure font-semibold">Search &amp; Pick Photo</span>
+                            <span className="text-xs text-muted">Unsplash · Upload · URL</span>
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -606,6 +649,21 @@ export default function SlideEditor({
           </div>
         </>
       )}
+
+      {/* Image Picker Modal */}
+      <ImagePickerModal
+        isOpen={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        onSelect={(url, credit) => handleSetSlotImage(pickerSlot, url, credit)}
+        slide={slide}
+        slotLabel={
+          activeLayout.imageSlots === 1 ? 'Background Image' :
+          pickerSlot === 0 ? 'Primary Image' :
+          pickerSlot === 1 ? 'Secondary Image' :
+          `Image ${pickerSlot + 1}`
+        }
+      />
     </aside>
   );
 }
+

@@ -138,6 +138,19 @@ export const POSTER_LAYOUT_TEMPLATES = {
 
 export const TEMPLATE_KEYS = Object.keys(POSTER_LAYOUT_TEMPLATES);
 
+/**
+ * Slide layout types — defines how many image slots each layout uses.
+ */
+export const SLIDE_LAYOUTS = {
+  full_bleed: { id: 'full_bleed', name: 'Full Bleed', desc: 'Single photo fills background edge-to-edge', imageSlots: 1, icon: '🖼️' },
+  split_image: { id: 'split_image', name: 'Split Image', desc: 'Photo on right half, text on left half', imageSlots: 1, icon: '⬛' },
+  top_image: { id: 'top_image', name: 'Top Photo', desc: 'Photo at top (poster template style)', imageSlots: 1, icon: '🔳' },
+  dual_image: { id: 'dual_image', name: 'Dual Images', desc: 'Two photos side by side with text below', imageSlots: 2, icon: '⬛⬛' },
+  text_only: { id: 'text_only', name: 'Text Only', desc: 'Pure typography, no image panel', imageSlots: 0, icon: '𝕋' },
+  collage_3: { id: 'collage_3', name: '3-Photo Collage', desc: 'Three photos tiled above text', imageSlots: 3, icon: '🔲🔲🔲' },
+};
+export const SLIDE_LAYOUT_KEYS = Object.keys(SLIDE_LAYOUTS);
+
 const imageCache = new Map();
 
 /**
@@ -557,16 +570,25 @@ export async function renderSlideToCanvas(slide, slideIndex = 0, targetCanvas = 
   ctx.textBaseline = 'top';
   ctx.textAlign = 'left';
 
-  // Load Image if present
-  let img = null;
-  if (slide.image) {
-    try {
-      img = await loadCanvasImage(slide.image);
-    } catch (e) {
-      console.warn('Failed to load image for slide ' + slideIndex, e);
-      img = null;
-    }
-  }
+  // Load Images — supports new images[] multi-slot and legacy single image field
+  const rawImages = slide.images && slide.images.length > 0
+    ? slide.images
+    : (slide.image ? [{ url: slide.image, fit: slide.fit || 'cover', focal: slide.focal != null ? slide.focal : 50 }] : []);
+
+  const loadedImages = await Promise.all(
+    rawImages.map(async (slot) => {
+      const src = typeof slot === 'string' ? slot : slot?.url;
+      if (!src) return null;
+      try { return await loadCanvasImage(src); } catch { return null; }
+    })
+  );
+  const img = loadedImages[0] || null;
+  // Per-slot proxy for drawImagePanel (carries fit/focal from slot)
+  const makeSlotProxy = (idx) => ({
+    ...slide,
+    fit: rawImages[idx]?.fit || slide.fit || 'cover',
+    focal: rawImages[idx]?.focal != null ? rawImages[idx].focal : (slide.focal != null ? slide.focal : 50),
+  });
 
   const maxContentWidth = CANVAS_SIZE - PADDING * 2; // 940px
   const frameText = resolveFrameLabel(slide, slideIndex, totalSlides, globalSettings);
@@ -994,8 +1016,176 @@ export async function renderSlideToCanvas(slide, slideIndex = 0, targetCanvas = 
     }
   }
 
+  // =========================================================================
+  // NEW SLIDE LAYOUTS: split_image, text_only, dual_image, collage_3
+  // These run AFTER the poster template system above.
+  // full_bleed and top_image just use the poster template system naturally.
+  // =========================================================================
+
+  if (slide.layout === 'split_image') {
+    const splitX = CANVAS_SIZE / 2 + 20;
+    const photoW = CANVAS_SIZE - splitX - 40;
+    const photoH = CANVAS_SIZE - 80;
+    drawImagePanel(ctx, makeSlotProxy(0), img, splitX, 40, photoW, photoH, theme, 'cover', 20);
+    ctx.fillStyle = theme.accentColor;
+    ctx.fillRect(splitX - 12, 70, 3, CANVAS_SIZE - 140);
+    const leftW = splitX - PADDING - 16;
+    let curY = PADDING + 20;
+    if (frameText) {
+      ctx.fillStyle = theme.accentColor;
+      ctx.font = '700 22px "Space Mono", monospace, sans-serif';
+      drawLetterSpaced(ctx, frameText, PADDING, curY, 5);
+      curY += 34;
+    }
+    if (showAccentRule) {
+      ctx.fillStyle = theme.accentColor;
+      drawRoundedRectPath(ctx, PADDING, curY, 50, 4, 2);
+      ctx.fill();
+      curY += 28;
+    }
+    let headFontSizeSL = 120;
+    let headLinesSL = [''];
+    while (headFontSizeSL > 44) {
+      ctx.font = `${headFontSizeSL}px ${fontFam}`;
+      headLinesSL = wrapText(ctx, rawHeadline, leftW);
+      if (headLinesSL.length <= 5 && curY + headLinesSL.length * headFontSizeSL < CANVAS_SIZE - 200) break;
+      headFontSizeSL -= 4;
+    }
+    if (headLinesSL.length > 5) headLinesSL = headLinesSL.slice(0, 5);
+    ctx.fillStyle = theme.headlineColor;
+    ctx.font = `${headFontSizeSL}px ${fontFam}`;
+    for (const line of headLinesSL) { ctx.fillText(line, PADDING, curY); curY += headFontSizeSL * 0.98; }
+    curY += 24;
+    if (slide.subtext) {
+      ctx.fillStyle = theme.subtextColor;
+      ctx.font = `400 ${subFontSize}px Inter, sans-serif`;
+      let subLinesSL = wrapText(ctx, slide.subtext, leftW);
+      if (subLinesSL.length > 5) subLinesSL = subLinesSL.slice(0, 5);
+      for (const line of subLinesSL) { ctx.fillText(line, PADDING, curY); curY += subFontSize * 1.34; }
+    }
+  } else if (slide.layout === 'text_only') {
+    ctx.save();
+    ctx.globalAlpha = 0.05;
+    ctx.fillStyle = theme.accentColor;
+    ctx.font = `900 700px ${fontFam}`;
+    ctx.textBaseline = 'bottom';
+    ctx.fillText(rawHeadline.charAt(0) || '?', PADDING - 30, CANVAS_SIZE + 60);
+    ctx.restore();
+    ctx.textBaseline = 'top';
+    let curY = PADDING + 40;
+    if (frameText) {
+      ctx.fillStyle = theme.accentColor;
+      ctx.font = '700 28px "Space Mono", monospace, sans-serif';
+      drawLetterSpaced(ctx, frameText, PADDING, curY, 6);
+      curY += 44;
+    }
+    if (showAccentRule) {
+      ctx.fillStyle = theme.accentColor;
+      drawRoundedRectPath(ctx, PADDING, curY, 80, 5, 2);
+      ctx.fill();
+      curY += 36;
+    }
+    let headFontSizeTO = 160;
+    let headLinesTO = [''];
+    while (headFontSizeTO > 60) {
+      ctx.font = `${headFontSizeTO}px ${fontFam}`;
+      headLinesTO = wrapText(ctx, rawHeadline, maxContentWidth);
+      if (headLinesTO.length <= 4 && curY + headLinesTO.length * headFontSizeTO * 0.98 < CANVAS_SIZE - 250) break;
+      headFontSizeTO -= 5;
+    }
+    if (headLinesTO.length > 5) headLinesTO = headLinesTO.slice(0, 5);
+    ctx.fillStyle = theme.headlineColor;
+    ctx.font = `${headFontSizeTO}px ${fontFam}`;
+    for (const line of headLinesTO) { ctx.fillText(line, PADDING, curY); curY += headFontSizeTO * 0.98; }
+    curY += 36;
+    if (slide.subtext) {
+      ctx.fillStyle = theme.accentColor;
+      ctx.fillRect(PADDING, curY, 5, 120);
+      ctx.fillStyle = theme.subtextColor;
+      ctx.font = `400 ${subFontSize + 4}px Inter, sans-serif`;
+      let subLinesTO = wrapText(ctx, slide.subtext, maxContentWidth - 28);
+      if (subLinesTO.length > 5) subLinesTO = subLinesTO.slice(0, 5);
+      for (let i = 0; i < subLinesTO.length; i++) {
+        ctx.fillText(subLinesTO[i], PADDING + 22, curY + 8 + i * (subFontSize + 4) * 1.34);
+      }
+    }
+  } else if (slide.layout === 'dual_image') {
+    let curY = PADDING;
+    const gapDI = 16;
+    const photoHDI = 400;
+    const photoWDI = (maxContentWidth - gapDI) / 2;
+    drawImagePanel(ctx, makeSlotProxy(0), loadedImages[0] || null, PADDING, curY, photoWDI, photoHDI, theme, 'cover', 12);
+    drawImagePanel(ctx, makeSlotProxy(1), loadedImages[1] || null, PADDING + photoWDI + gapDI, curY, photoWDI, photoHDI, theme, 'cover', 12);
+    curY += photoHDI + 30;
+    if (frameText) {
+      ctx.fillStyle = theme.accentColor;
+      ctx.font = '700 26px "Space Mono", monospace, sans-serif';
+      drawLetterSpaced(ctx, frameText, PADDING, curY, 5);
+      curY += 38;
+    }
+    if (showAccentRule) {
+      ctx.fillStyle = theme.accentColor;
+      drawRoundedRectPath(ctx, PADDING, curY, 60, 4, 2);
+      ctx.fill();
+      curY += 30;
+    }
+    let headFontSizeDI = 120;
+    let headLinesDI = [''];
+    while (headFontSizeDI > 50) {
+      ctx.font = `${headFontSizeDI}px ${fontFam}`;
+      headLinesDI = wrapText(ctx, rawHeadline, maxContentWidth);
+      if (headLinesDI.length <= 2 && curY + headLinesDI.length * headFontSizeDI * 0.98 < CANVAS_SIZE - 130) break;
+      headFontSizeDI -= 4;
+    }
+    if (headLinesDI.length > 3) headLinesDI = headLinesDI.slice(0, 3);
+    ctx.fillStyle = theme.headlineColor;
+    ctx.font = `${headFontSizeDI}px ${fontFam}`;
+    for (const line of headLinesDI) { ctx.fillText(line, PADDING, curY); curY += headFontSizeDI * 0.98; }
+    curY += 18;
+    if (slide.subtext) {
+      ctx.fillStyle = theme.subtextColor;
+      ctx.font = `400 ${subFontSize}px Inter, sans-serif`;
+      let subLinesDI = wrapText(ctx, slide.subtext, maxContentWidth);
+      if (subLinesDI.length > 2) subLinesDI = subLinesDI.slice(0, 2);
+      for (const line of subLinesDI) { ctx.fillText(line, PADDING, curY); curY += subFontSize * 1.32; }
+    }
+  } else if (slide.layout === 'collage_3') {
+    let curY = PADDING;
+    const gapC3 = 10;
+    const bigWC3 = maxContentWidth * 0.58;
+    const smallWC3 = maxContentWidth - bigWC3 - gapC3;
+    const collageHC3 = 440;
+    const smallHC3 = (collageHC3 - gapC3) / 2;
+    drawImagePanel(ctx, makeSlotProxy(0), loadedImages[0] || null, PADDING, curY, bigWC3, collageHC3, theme, 'cover', 12);
+    drawImagePanel(ctx, makeSlotProxy(1), loadedImages[1] || null, PADDING + bigWC3 + gapC3, curY, smallWC3, smallHC3, theme, 'cover', 12);
+    drawImagePanel(ctx, makeSlotProxy(2), loadedImages[2] || null, PADDING + bigWC3 + gapC3, curY + smallHC3 + gapC3, smallWC3, smallHC3, theme, 'cover', 12);
+    curY += collageHC3 + 28;
+    if (frameText) {
+      ctx.fillStyle = theme.accentColor;
+      ctx.font = '700 24px "Space Mono", monospace, sans-serif';
+      drawLetterSpaced(ctx, frameText, PADDING, curY, 5);
+      curY += 36;
+    }
+    let headFontSizeC3 = 108;
+    let headLinesC3 = [''];
+    while (headFontSizeC3 > 50) {
+      ctx.font = `${headFontSizeC3}px ${fontFam}`;
+      headLinesC3 = wrapText(ctx, rawHeadline, maxContentWidth);
+      if (headLinesC3.length <= 2 && curY + headLinesC3.length * headFontSizeC3 < CANVAS_SIZE - 80) break;
+      headFontSizeC3 -= 4;
+    }
+    if (headLinesC3.length > 2) headLinesC3 = headLinesC3.slice(0, 2);
+    ctx.fillStyle = theme.headlineColor;
+    ctx.font = `${headFontSizeC3}px ${fontFam}`;
+    for (const line of headLinesC3) { ctx.fillText(line, PADDING, curY); curY += headFontSizeC3 * 0.98; }
+  }
+
   // 5. Image Credit (Metadata caption at bottom-left)
-  const creditText = slide.credit || globalSettings?.globalCredit || '';
+  const creditText = (
+    (slide.images?.length > 0 ? slide.images.map(i => i?.credit).filter(Boolean).join(', ') : '') ||
+    slide.credit || globalSettings?.globalCredit || ''
+  );
+
   if (creditText && creditText.trim()) {
     ctx.fillStyle = theme.creditColor || '#666666';
     ctx.font = '400 20px Inter, sans-serif';

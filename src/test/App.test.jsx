@@ -17,7 +17,7 @@ describe('Carousel Poster Studio Frontend App Component', () => {
     expect(screen.getAllByText(/1080/i).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText(/All-At-Once Builder/i)).toBeInTheDocument();
     expect(screen.getByText(/News → Slides/i)).toBeInTheDocument();
-    expect(screen.getByText(/Download ZIP/i)).toBeInTheDocument();
+    expect(screen.getByText(/Save All/i)).toBeInTheDocument();
   });
 
   it('switches to Home dashboard and displays featured poster templates', async () => {
