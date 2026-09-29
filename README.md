@@ -1,55 +1,69 @@
-# Carousel Poster Studio (local)
+# Carousel Poster Studio 🎨⚡
 
-A local-first web app that turns tech/AI news into downloadable social-media
-carousel posters — square 1080x1080 PNGs sized for Instagram and Threads.
+A high-performance, local-first studio for converting tech and AI news stories into square **1080 &times; 1080 px** social media carousel posters (Instagram & Threads format).
 
-## Run it
+---
 
-No build step, no server, no account. Just open the file:
+## ✨ Features
 
-- **Double-click `index.html`**, or
-- serve it locally: `python3 -m http.server 8000` and open
-  `http://localhost:8000`
+- **Exact Design Spec (1080 &times; 1080 px)**:
+  - **Near-Black Background**: `#0B0B0B`.
+  - **Top Image Panel**: 400px height with 12px rounded corners, Cover fit crop with vertical focal-point slider or Contain fit mode.
+  - **Frame Label & Rule**: `#CDFF3C` Lime accent, `FRAME 01` letter-spaced monospace font with 60px &times; 4px underline rule.
+  - **Heavy Grotesque Headline**: Google Fonts **Anton** or **Archivo Black**, pure white `#FFFFFF`, tight line-height, with intelligent auto-shrink algorithm to guarantee zero canvas overflow.
+  - **Roast / Subtext**: Google Fonts **Inter**, `#D8D8D8`, comfortable 1.35 line height.
+  - **70px Margins**: Crisp safe padding on all borders.
 
-Works offline except for two optional CDN loads (Google Fonts and the JSZip
-library), which degrade gracefully.
+- **⚡ All-At-Once Batch Deck Builder**:
+  - Paste multiple news stories and drag-and-drop multiple image files all at once.
+  - Auto-pairs Image 1 &rarr; Slide 1, Image 2 &rarr; Slide 2, etc.
+  - Direct structured copy parser (`HEADLINE: ...`, `SUBTEXT: ...`, `IMAGE: ...`, `CREDIT: ...`).
 
-## Workflow
+- **🤖 3 LLM / Copy Generation Modes**:
+  1. **Opencode CLI (Local)**: Automatically bridges with your local `opencode` installation using your existing credentials.
+  2. **Direct API (OpenAI-compatible)**: Connect to OpenAI (`https://api.openai.com/v1`), OpenRouter, Groq, DeepSeek, or any compatible endpoint with custom API key and model name.
+  3. **Ollama (Local)**: Direct connection to `http://localhost:11434` with model selector (`llama3.2`, `mistral`, etc.).
 
-1. Click **News → Slides**, paste news text, and generate headline/subtext
-   pairs (requires the LLM to be configured, see below).
-2. Or write copy manually: select a slide, edit **Headline** and **Subtext**.
-3. Attach a **real image** per slide — upload a file or paste an image URL.
-   (URL hosts that block cross-origin fetching will fail; upload the file
-   instead. The app never generates AI images.)
-4. Adjust fit (cover/contain) and the focal-point slider for crops.
-5. **Download this slide as PNG**, or **Download all as ZIP**
-   (`slide-01.png`, `slide-02.png`, … in deck order).
+- **💾 Project Persistence & Export**:
+  - **Autosave**: Real-time debounce saving to browser `localStorage`.
+  - **JSON Project Export/Import**: Full portable project `.json` with embedded data URLs.
+  - **PNG Export**: Single-click 1080x1080 PNG download.
+  - **Copy PNG to Clipboard**: Instant pasting into Discord, Figma, or Slack.
+  - **ZIP Archive Export**: Bundles `slide-01.png`, `slide-02.png`, ... in deck order using JSZip.
 
-## Deck management
+---
 
-Add / delete / duplicate slides, drag to reorder (frame numbers like
-`FRAME 01` update automatically). The header shows the slide count.
+## 🚀 Getting Started
 
-## Project files
+### 1. Run Development Server
+```bash
+npm install
+npm run dev
+```
+Open **`http://localhost:3000`** (or `http://localhost:3001`).
 
-- Autosaves to the browser's localStorage.
-- **Export JSON / Import JSON** for portable project files — images are
-  embedded as data URLs, so one JSON file carries everything.
+### 2. Build Production Bundle
+```bash
+npm run build
+```
 
-## LLM copy generation (optional)
+---
 
-Click **LLM Settings**:
+## 📋 Copywriter System Prompt (Embedded Verbatim)
 
-- **Ollama (local):** endpoint `http://localhost:11434`, model e.g. `llama3.1`.
-  Start Ollama first (`ollama serve`).
-- **OpenAI-compatible API:** endpoint base URL, model name, API key.
+```text
+You write carousel-poster copy about AI and tech news. For EACH story produce exactly:
+HEADLINE: under 10 words, bold, funny, attention-grabbing. No em dashes, no corporate speak.
+SUBTEXT: 2-4 short lines that summarize the story with a joke, roast, or witty twist.
+Tone: blunt, witty, internet-native, like a smart friend roasting tech news. Punchy over polished.
+Output format per story:
+HEADLINE: <text>
+SUBTEXT: <text>
+```
 
-The **News → Slides** button only appears once an endpoint and model are set.
+---
 
-## Notes
+## ⌨️ Keyboard Shortcuts
 
-- Slide design: 1080x1080, near-black `#0B0B0B`, Anton headline, Inter
-  subtext, lime `#CDFF3C` frame labels. Long headlines auto-shrink and
-  clamp so they never overflow the canvas.
-- Image credits you enter are drawn tiny in the poster's bottom-left corner.
+- `Left Arrow` / `Right Arrow`: Navigate previous / next slide.
+- `Ctrl + D` / `Cmd + D`: Duplicate active slide.
