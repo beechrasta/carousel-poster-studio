@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Carousel Poster Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: Inter, system-ui, sans-serif; background: #141414; color: #eee; }
+  header { display: flex; align-items: center; gap: 14px; padding: 12px 20px; background: #0d0d0d; border-bottom: 1px solid #2a2a2a; }
+  header h1 { font-size: 18px; margin: 0; font-weight: 700; }
+  .badge { font-size: 12px; color: #aaa; background: #1e1e1e; border: 1px solid #333; padding: 3px 10px; border-radius: 20px; }
+  .spacer { flex: 1; }
+  button { font-family: inherit; cursor: pointer; }
+  .btn { background: #242424; color: #eee; border: 1px solid #3a3a3a; border-radius: 8px; padding: 8px 14px; font-size: 13px; }
+  .btn:hover { background: #2e2e2e; }
+  .btn.primary { background: #CDFF3C; color: #111; border: none; font-weight: 700; }
+  .btn.primary:hover { background: #d8ff70; }
+  .btn.danger { color: #ff8080; }
+  .btn.small { padding: 4px 9px; font-size: 12px; }
+  main { display: grid; grid-template-columns: 250px 1fr 340px; height: calc(100vh - 58px); }
+  #deck { background: #101010; border-right: 1px solid #2a2a2a; padding: 12px; overflow-y: auto; }
+  #deck h3, #editor h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; color: #888; margin: 4px 0 12px; }
+  .slide-item { background: #1a1a1a; border: 2px solid #2c2c2c; border-radius: 10px; padding: 8px; margin-bottom: 10px; cursor: grab; }
+  .slide-item.active { border-color: #CDFF3C; }
+  .slide-item canvas { width: 100%; border-radius: 6px; display: block; background: #0b0b0b; }
+  .slide-item .row { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
+  .slide-item .num { font-size: 12px; color: #aaa; font-weight: 700; }
+  .drag-handle { cursor: grab; color: #666; font-size: 14px; }
+  #stage { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: #1b1b1b; padding: 20px; overflow: auto; }
+  #preview { max-width: 100%; max-height: calc(100vh - 220px); border-radius: 8px; box-shadow: 0 8px 40px rgba(0,0,0,.6); background: #0b0b0b; }
+  .stage-actions { display: flex; gap: 10px; }
+  #editor { background: #101010; border-left: 1px solid #2a2a2a; padding: 16px; overflow-y: auto; }
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 12px; color: #aaa; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 1px; }
+  .field textarea, .field input[type=text], .field input[type=url] { width: 100%; background: #1c1c1c; color: #eee; border: 1px solid #3a3a3a; border-radius: 8px; padding: 9px 11px; font-size: 14px; font-family: inherit; }
+  .field textarea { min-height: 70px; resize: vertical; }
+  .field input[type=file] { width: 100%; font-size: 13px; color: #aaa; }
+  .field select { width: 100%; background: #1c1c1c; color: #eee; border: 1px solid #3a3a3a; border-radius: 8px; padding: 8px; }
+  .field input[type=range] { width: 100%; accent-color: #CDFF3C; }
+  .img-preview { width: 100%; border-radius: 8px; margin-top: 8px; display: block; background: #1c1c1c; }
+  .hint { font-size: 12px; color: #777; margin-top: 6px; line-height: 1.5; }
+  .modal-back { position: fixed; inset: 0; background: rgba(0,0,0,.65); display: none; align-items: center; justify-content: center; z-index: 50; }
+  .modal-back.open { display: flex; }
+  .modal { background: #181818; border: 1px solid #333; border-radius: 12px; padding: 24px; width: 480px; max-width: 92vw; max-height: 88vh; overflow-y: auto; }
+  .modal h2 { margin: 0 0 16px; font-size: 18px; }
+  .modal .field textarea { min-height: 140px; }
+  #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #242424; border: 1px solid #444; color: #eee; padding: 10px 18px; border-radius: 10px; font-size: 14px; display: none; z-index: 99; max-width: 80vw; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Carousel Poster Studio</h1>
+  <span class="badge" id="slideCount">0 slides</span>
+  <span class="badge">1080 &times; 1080</span>
+  <div class="spacer"></div>
+  <button class="btn" id="btnNews">News &rarr; Slides</button>
+  <button class="btn" id="btnSettings">LLM Settings</button>
+  <button class="btn" id="btnExportJson">Export JSON</button>
+  <button class="btn" id="btnImportJson">Import JSON</button>
+  <input type="file" id="importFile" accept="application/json" style="display:none">
+  <button class="btn primary" id="btnZip">Download all as ZIP</button>
+</header>
+<main>
+  <aside id="deck">
+    <h3>Slides</h3>
+    <div id="slideList"></div>
+    <button class="btn" id="btnAdd" style="width:100%">+ Add slide</button>
+  </aside>
+  <section id="stage">
+    <canvas id="preview" width="540" height="540"></canvas>
+    <div class="stage-actions">
+      <button class="btn primary" id="btnPng">Download this slide as PNG</button>
+      <button class="btn danger" id="btnDelete">Delete slide</button>
+      <button class="btn" id="btnDuplicate">Duplicate slide</button>
+    </div>
+  </section>
+  <aside id="editor">
+    <h3>Edit slide <span id="editNum"></span></h3>
+    <div class="field">
+      <label>Headline</label>
+      <textarea id="fHeadline" placeholder="Punchy headline, under 10 words"></textarea>
+    </div>
+    <div class="field">
+      <label>Subtext</label>
+      <textarea id="fSubtext" placeholder="2-4 lines with a joke or roast"></textarea>
+    </div>
+    <div class="field">
+      <label>Image (upload file)</label>
+      <input type="file" id="fImageFile" accept="image/*">
+    </div>
+    <div class="field">
+      <label>Image (paste URL)</label>
+      <div style="display:flex;gap:8px">
+        <input type="url" id="fImageUrl" placeholder="https://...">
+        <button class="btn small" id="btnAttachUrl">Attach</button>
+      </div>
+      <div class="hint">URL images are downloaded and embedded locally. If the host blocks it (CORS), upload the file instead.</div>
+      <img class="img-preview" id="imgPreview" style="display:none">
+      <div style="margin-top:8px;display:flex;gap:8px">
+        <button class="btn small" id="btnRemoveImg">Remove image</button>
+      </div>
+    </div>
+    <div class="field">
+      <label>Image fit</label>
+      <select id="fFit">
+        <option value="cover">Cover (crop to fill)</option>
+        <option value="contain">Contain (fit whole image)</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Focal point (cover crop vertical)</label>
+      <input type="range" id="fFocal" min="0" max="100" value="50">
+      <div class="hint">0 = show top of image, 100 = show bottom.</div>
+    </div>
+    <div class="field">
+      <label>Image credit / source</label>
+      <input type="text" id="fCredit" placeholder="e.g. Photo: Nvidia / Flickr (CC)">
+    </div>
+  </aside>
+</main>
+
+<div class="modal-back" id="settingsModal">
+  <div class="modal">
+    <h2>LLM Settings</h2>
+    <div class="field">
+      <label>Provider</label>
+      <select id="sProvider">
+        <option value="ollama">Ollama (local)</option>
+        <option value="openai">OpenAI-compatible API</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Endpoint</label>
+      <input type="text" id="sEndpoint" placeholder="http://localhost:11434">
+      <div class="hint">Ollama: base URL. OpenAI-compatible: base URL ending before /chat/completions, e.g. https://api.openai.com/v1</div>
+    </div>
+    <div class="field">
+      <label>Model</label>
+      <input type="text" id="sModel" placeholder="e.g. llama3.1">
+    </div>
+    <div class="field">
+      <label>API key (OpenAI-compatible only)</label>
+      <input type="text" id="sKey" placeholder="sk-...">
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px">
+      <button class="btn" id="btnSettingsClose">Close</button>
+      <button class="btn primary" id="btnSettingsSave">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-back" id="newsModal">
+  <div class="modal">
+    <h2>Generate slides from news</h2>
+    <div class="field">
+      <label>Paste news stories (one or several)</label>
+      <textarea id="newsText" placeholder="Paste the news text here..."></textarea>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button class="btn" id="btnNewsClose">Cancel</button>
+      <button class="btn primary" id="btnGenerate">Generate slides</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+'use strict';
+/* ============ constants ============ */
+const S = 1080, PAD = 70, LIME = '#CDFF3C';
+const IMG_H = 400;                 // image panel height (~37% of canvas)
+const JSZIP_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+const SYSTEM_PROMPT = "You write carousel-poster copy about AI and tech news. For EACH story produce exactly:\nHEADLINE: under 10 words, bold, funny, attention-grabbing. No em dashes, no corporate speak.\nSUBTEXT: 2-4 short lines that summarize the story with a joke, roast, or witty twist.\nTone: blunt, witty, internet-native, like a smart friend roasting tech news. Punchy over polished.\nOutput format per story:\nHEADLINE: <text>\nSUBTEXT: <text>";
+
+const $ = id => document.getElementById(id);
+const uid = () => Math.random().toString(36).slice(2, 10);
+function toast(msg, ms) { const t = $('toast'); t.textContent = msg; t.style.display = 'block'; clearTimeout(t._h); t._h = setTimeout(() => t.style.display = 'none', ms || 2800); }
+
+/* ============ state ============ */
+function blankSlide() { return { id: uid(), headline: '', subtext: '', image: null, fit: 'cover', focal: 50, credit: '' }; }
+function seedSlides() {
+  return [
+    { id: uid(), headline: "OpenAI just killed its own model before launch", subtext: "GPT-6.1 'Astra' got scrapped for being too deceptive in testing. The AI was literally too shady to ship, a day before DevDay. We are so back (to the safety meetings).", image: null, fit: 'cover', focal: 50, credit: '' },
+    { id: uid(), headline: "Nvidia wants to be the seatbelt of the AI world", subtext: "New Open Agent Safety Platform, 100+ companies signed on, claims it would've stopped the Hugging Face breach. Plus a casual $150B buyback. Jensen stays winning.", image: null, fit: 'cover', focal: 50, credit: '' },
+    { id: uid(), headline: "Congress finally discovered AI exists", subtext: "Florida wants OpenAI in court, Sanders and AOC want to ban superintelligence, and Trump wants an 'AI Force' branch. Everyone has a plan. None of them agree.", image: null, fit: 'cover', focal: 50, credit: '' }
+  ];
+}
+let state = { slides: seedSlides(), current: 0 };
+let settings = { provider: 'ollama', endpoint: 'http://localhost:11434', model: '', apiKey: '' };
+
+function saveProject() {
+  try { localStorage.setItem('cps-project', JSON.stringify(state)); }
+  catch (e) { toast('Autosave failed: project too large for localStorage (big images). Use Export JSON.'); }
+}
+function loadProject() {
+  try {
+    const raw = localStorage.getItem('cps-project');
+    if (raw) { const p = JSON.parse(raw); if (Array.isArray(p.slides) && p.slides.length) { state = p; } }
+    const s = localStorage.getItem('cps-settings');
+    if (s) { settings = Object.assign(settings, JSON.parse(s)); }
+  } catch (e) { /* corrupted storage -> keep seeds */ }
+  if (state.current >= state.slides.length) state.current = 0;
+}
+const cur = () => state.slides[state.current];
+
+/* ============ canvas rendering (single source of truth for preview + export) ============ */
+const imgCache = new Map();
+function loadImage(dataUrl) {
+  if (imgCache.has(dataUrl)) return imgCache.get(dataUrl);
+  const p = new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => rej(new Error('decode')); im.src = dataUrl; });
+  imgCache.set(dataUrl, p);
+  return p;
+}
+async function ensureFonts() {
+  try {
+    await Promise.all([
+      document.fonts.load('148px Anton'),
+      document.fonts.load('500 30px Inter'),
+      document.fonts.load('400 36px Inter'),
+      document.fonts.load('700 14px Inter')
+    ]);
+  } catch (e) { /* offline -> fallback fonts */ }
+}
+function wrapLines(x, text, maxW) {
+  const words = String(text || '').split(/\s+/).filter(Boolean);
+  const lines = [];
+  let line = '';
+  for (const w of words) {
+    const t = line ? line + ' ' + w : w;
+    if (x.measureText(t).width <= maxW || !line) line = t;
+    else { lines.push(line); line = w; }
+  }
+  if (line) lines.push(line);
+  return lines.length ? lines : [''];
+}
+function rr(x, bx, by, w, h, r) {
+  x.beginPath();
+  if (x.roundRect) { x.roundRect(bx, by, w, h, r); return; }
+  x.moveTo(bx + r, by);
+  x.arcTo(bx + w, by, bx + w, by + h, r);
+  x.arcTo(bx + w, by + h, bx, by + h, r);
+  x.arcTo(bx, by + h, bx, by, r);
+  x.arcTo(bx, by, bx + w, by, r);
+  x.closePath();
+}
+function drawSpaced(x, text, bx, by, spacing) {
+  let cx = bx;
+  const prevAlign = x.textAlign; x.textAlign = 'left';
+  for (const ch of text) { x.fillText(ch, cx, by); cx += x.measureText(ch).width + spacing; }
+  x.textAlign = prevAlign;
+}
+function drawImagePanel(x, slide, img, bx, by, w, h) {
+  x.save();
+  rr(x, bx, by, w, h, 12);
+  x.clip();
+  if (img) {
+    if (slide.fit === 'contain') {
+      x.fillStyle = '#141414'; x.fillRect(bx, by, w, h);
+      const s = Math.min(w / img.width, h / img.height);
+      const dw = img.width * s, dh = img.height * s;
+      x.drawImage(img, bx + (w - dw) / 2, by + (h - dh) / 2, dw, dh);
+    } else {
+      const s = Math.max(w / img.width, h / img.height);
+      const dw = img.width * s, dh = img.height * s;
+      const focal = Math.min(100, Math.max(0, slide.focal != null ? slide.focal : 50)) / 100;
+      x.drawImage(img, bx + (w - dw) / 2, by + (h - dh) * focal, dw, dh);
+    }
+  } else {
+    x.fillStyle = '#161616'; x.fillRect(bx, by, w, h);
+    x.setLineDash([14, 10]);
+    x.strokeStyle = '#3a3a3a'; x.lineWidth = 3;
+    rr(x, bx + 14, by + 14, w - 28, h - 28, 10); x.stroke();
+    x.setLineDash([]);
+    x.fillStyle = '#555'; x.font = '400 30px Inter, sans-serif';
+    x.textAlign = 'center'; x.textBaseline = 'middle';
+    x.fillText('No image attached', bx + w / 2, by + h / 2 - 18);
+    x.font = '400 24px Inter, sans-serif'; x.fillStyle = '#444';
+    x.fillText('upload a file or paste an image URL', bx + w / 2, by + h / 2 + 20);
+    x.textAlign = 'left'; x.textBaseline = 'alphabetic';
+  }
+  x.restore();
+}
+async function drawSlide(slide, idx) {
+  const c = document.createElement('canvas');
+  c.width = S; c.height = S;
+  const x = c.getContext('2d');
+  x.fillStyle = '#0B0B0B'; x.fillRect(0, 0, S, S);
+  x.textBaseline = 'top'; x.textAlign = 'left';
+  const maxW = S - PAD * 2;
+  let y = PAD;
+
+  // image panel
+  let img = null;
+  if (slide.image) { try { img = await loadImage(slide.image); } catch (e) { img = null; } }
+  drawImagePanel(x, slide, img, PAD, y, maxW, IMG_H);
+  y += IMG_H + 42;
+
+  // frame label
+  x.fillStyle = LIME;
+  x.font = '500 30px Inter, sans-serif';
+  const label = 'FRAME ' + String(idx + 1).padStart(2, '0');
+  drawSpaced(x, label, PAD, y, 8);
+  y += 46;
+  // lime rule
+  x.fillStyle = LIME;
+  x.fillRect(PAD, y, 60, 4);
+  y += 4 + 44;
+
+  // measure subtext first so the headline can shrink to fit the remaining space
+  let subSize = 36;
+  x.font = '400 ' + subSize + 'px Inter, sans-serif';
+  let subLines = wrapLines(x, slide.subtext, maxW);
+  while (subLines.length > 5 && subSize > 28) {
+    subSize -= 2;
+    x.font = '400 ' + subSize + 'px Inter, sans-serif';
+    subLines = wrapLines(x, slide.subtext, maxW);
+  }
+  if (subLines.length > 5) subLines = subLines.slice(0, 5);
+  const subLH = subSize * 1.35;
+
+  // headline: shrink until lines<=4 AND everything fits above the bottom pad
+  const headTop = y;
+  const gap = 30;
+  let hSize = 148, headLines = [''];
+  while (hSize > 56) {
+    x.font = hSize + 'px Anton, "Arial Narrow", Impact, sans-serif';
+    headLines = wrapLines(x, slide.headline, maxW);
+    const need = headLines.length * hSize * 0.98 + gap + subLines.length * subLH;
+    if (headLines.length <= 4 && headTop + need <= S - PAD) break;
+    hSize -= 4;
+  }
+  // hard guarantee: clamp to whatever actually fits, ellipsizing the last line
+  const headLH0 = hSize * 0.98;
+  const maxHeadLines = Math.max(1, Math.floor(((S - PAD) - headTop - gap - subLines.length * subLH) / headLH0));
+  const allowed = Math.min(4, maxHeadLines);
+  if (headLines.length > allowed) {
+    headLines = headLines.slice(0, allowed);
+    headLines[allowed - 1] = headLines[allowed - 1].replace(/\s+$/, '').replace(/…$/, '') + '…';
+  }
+  const headLH = hSize * 0.98;
+  x.fillStyle = '#FFFFFF';
+  x.font = hSize + 'px Anton, "Arial Narrow", Impact, sans-serif';
+  let hy = headTop;
+  for (const ln of headLines) { x.fillText(ln, PAD, hy); hy += headLH; }
+
+  // subtext
+  x.fillStyle = '#D8D8D8';
+  x.font = '400 ' + subSize + 'px Inter, sans-serif';
+  let sy = hy + gap;
+  for (const ln of subLines) { x.fillText(ln, PAD, sy); sy += subLH; }
+
+  // credit (tiny, bottom-left) — metadata only, subtle
+  if (slide.credit) {
+    x.fillStyle = '#666'; x.font = '400 20px Inter, sans-serif';
+    x.fillText('Img: ' + slide.credit, PAD, S - PAD - 24);
+  }
+  return c;
+}
+
+/* ============ UI rendering ============ */
+let renderTimer = null;
+function scheduleRender(immediate) {
+  if (immediate) { renderAll(); return; }
+  clearTimeout(renderTimer);
+  renderTimer = setTimeout(renderAll, 160);
+}
+async function renderAll() {
+  await ensureFonts();
+  renderDeckList();
+  syncEditor();
+  await renderPreview();
+  $('slideCount').textContent = state.slides.length + (state.slides.length === 1 ? ' slide' : ' slides');
+  $('btnNews').style.display = (settings.endpoint && settings.model) ? '' : 'none';
+  saveProject();
+}
+async function renderDeckList() {
+  const list = $('slideList');
+  list.innerHTML = '';
+  for (let i = 0; i < state.slides.length; i++) {
+    const s = state.slides[i];
+    const item = document.createElement('div');
+    item.className = 'slide-item' + (i === state.current ? ' active' : '');
+    item.draggable = true;
+    item.dataset.idx = i;
+    const cv = document.createElement('canvas');
+    cv.width = 220; cv.height = 220;
+    item.appendChild(cv);
+    const row = document.createElement('div');
+    row.className = 'row';
+    row.innerHTML = '<span class="drag-handle">⠿</span><span class="num">' + (i + 1) + '</span><span style="flex:1"></span>';
+    const dup = document.createElement('button'); dup.className = 'btn small'; dup.textContent = '⧉'; dup.title = 'Duplicate';
+    dup.onclick = e => { e.stopPropagation(); duplicateSlide(i); };
+    const del = document.createElement('button'); del.className = 'btn small danger'; del.textContent = '✕'; del.title = 'Delete';
+    del.onclick = e => { e.stopPropagation(); deleteSlide(i); };
+    row.appendChild(dup); row.appendChild(del);
+    item.appendChild(row);
+    item.onclick = () => { state.current = i; scheduleRender(true); };
+    item.ondragstart = e => { e.dataTransfer.setData('text/plain', i); item.style.opacity = '0.4'; };
+    item.ondragend = () => { item.style.opacity = ''; };
+    item.ondragover = e => e.preventDefault();
+    item.ondrop = e => {
+      e.preventDefault();
+      const from = parseInt(e.dataTransfer.getData('text/plain'), 10);
+      if (isNaN(from) || from === i) return;
+      const [mv] = state.slides.splice(from, 1);
+      state.slides.splice(i, 0, mv);
+      state.current = i;
+      scheduleRender(true);
+    };
+    list.appendChild(item);
+    try {
+      const full = await drawSlide(s, i);
+      const tctx = cv.getContext('2d');
+      tctx.drawImage(full, 0, 0, 220, 220);
+    } catch (e) { /* thumbnail failure is non-fatal */ }
+  }
+}
+function syncEditor() {
+  const s = cur();
+  if (!s) return;
+  $('editNum').textContent = '#' + (state.current + 1);
+  if (document.activeElement !== $('fHeadline')) $('fHeadline').value = s.headline || '';
+  if (document.activeElement !== $('fSubtext')) $('fSubtext').value = s.subtext || '';
+  $('fFit').value = s.fit || 'cover';
+  $('fFocal').value = s.focal != null ? s.focal : 50;
+  if (document.activeElement !== $('fCredit')) $('fCredit').value = s.credit || '';
+  const pv = $('imgPreview');
+  if (s.image) { pv.src = s.image; pv.style.display = 'block'; }
+  else { pv.style.display = 'none'; pv.removeAttribute('src'); }
+}
+async function renderPreview() {
+  const s = cur();
+  const pc = $('preview');
+  const pctx = pc.getContext('2d');
+  pctx.clearRect(0, 0, pc.width, pc.height);
+  if (!s) return;
+  try {
+    const full = await drawSlide(s, state.current);
+    pctx.drawImage(full, 0, 0, pc.width, pc.height);
+  } catch (e) { toast('Preview render failed: ' + e.message); }
+}
+
+/* ============ deck operations ============ */
+function addSlide() { state.slides.push(blankSlide()); state.current = state.slides.length - 1; scheduleRender(true); }
+function deleteSlide(i) {
+  if (state.slides.length <= 1) { toast('A deck needs at least one slide.'); return; }
+  state.slides.splice(i, 1);
+  if (state.current >= state.slides.length) state.current = state.slides.length - 1;
+  scheduleRender(true);
+}
+function duplicateSlide(i) {
+  const copy = JSON.parse(JSON.stringify(state.slides[i]));
+  copy.id = uid();
+  state.slides.splice(i + 1, 0, copy);
+  state.current = i + 1;
+  scheduleRender(true);
+}
+
+/* ============ images ============ */
+function blobToDataURL(blob) {
+  return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(blob); });
+}
+async function attachDataURL(dataUrl) {
+  if (!dataUrl.startsWith('data:image/')) { toast('That file is not an image.'); return; }
+  if (dataUrl.length > 12 * 1024 * 1024) { toast('Image is very large (>~9MB); it may break autosave. It will still work.'); }
+  cur().image = dataUrl;
+  scheduleRender(true);
+}
+async function urlToDataURL(url) {
+  const res = await fetch(url, { mode: 'cors' });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const blob = await res.blob();
+  if (!blob.type.startsWith('image/')) throw new Error('URL did not return an image (got ' + (blob.type || 'unknown') + ')');
+  return blobToDataURL(blob);
+}
+
+/* ============ export ============ */
+function canvasToBlob(canvas) {
+  return new Promise((res, rej) => canvas.toBlob(b => b ? res(b) : rej(new Error('toBlob failed')), 'image/png'));
+}
+function downloadBlob(blob, name) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 4000);
+}
+async function exportPNG(i) {
+  try {
+    const full = await drawSlide(state.slides[i], i);
+    const blob = await canvasToBlob(full);
+    downloadBlob(blob, 'slide-' + String(i + 1).padStart(2, '0') + '.png');
+    toast('PNG downloaded.');
+  } catch (e) { toast('PNG export failed: ' + e.message); }
+}
+function loadScript(src) {
+  return new Promise((res, rej) => {
+    const sc = document.createElement('script');
+    sc.src = src; sc.onload = res; sc.onerror = () => rej(new Error('load'));
+    document.head.appendChild(sc);
+  });
+}
+async function exportZIP() {
+  try {
+    if (typeof JSZip === 'undefined') {
+      toast('Loading ZIP library...');
+      await loadScript(JSZIP_CDN);
+    }
+    if (typeof JSZip === 'undefined') throw new Error('unavailable');
+    const zip = new JSZip();
+    for (let i = 0; i < state.slides.length; i++) {
+      const full = await drawSlide(state.slides[i], i);
+      const blob = await canvasToBlob(full);
+      zip.file('slide-' + String(i + 1).padStart(2, '0') + '.png', blob);
+    }
+    const content = await zip.generateAsync({ type: 'blob' });
+    downloadBlob(content, 'carousel-posters.zip');
+    toast('ZIP downloaded: ' + state.slides.length + ' slides.');
+  } catch (e) {
+    toast('ZIP export needs the JSZip CDN (network). Individual PNG export still works.');
+  }
+}
+function exportJSON() {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+  downloadBlob(blob, 'poster-project.json');
+  toast('Project JSON downloaded.');
+}
+function importJSON(file) {
+  const r = new FileReader();
+  r.onload = () => {
+    try {
+      const p = JSON.parse(r.result);
+      if (!p || !Array.isArray(p.slides) || !p.slides.length) throw new Error('bad shape');
+      p.slides.forEach(s => { if (!s.id) s.id = uid(); if (s.focal == null) s.focal = 50; if (!s.fit) s.fit = 'cover'; });
+      state = { slides: p.slides, current: 0 };
+      imgCache.clear();
+      scheduleRender(true);
+      toast('Project imported: ' + p.slides.length + ' slides.');
+    } catch (e) { toast('Import failed: not a valid project file.'); }
+  };
+  r.readAsText(file);
+}
+
+/* ============ LLM slide generation ============ */
+function parseSlides(text) {
+  const out = [];
+  const re = /HEADLINE:\s*(.+?)\s*SUBTEXT:\s*([\s\S]+?)(?=HEADLINE:|$)/gi;
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    const headline = m[1].trim().replace(/^["']|["']$/g, '');
+    const subtext = m[2].trim().replace(/^["']|["']$/g, '');
+    if (headline) out.push({ id: uid(), headline, subtext, image: null, fit: 'cover', focal: 50, credit: '' });
+  }
+  return out;
+}
+async function callLLM(newsText) {
+  const ep = settings.endpoint.replace(/\/+$/, '');
+  if (settings.provider === 'ollama') {
+    const res = await fetch(ep + '/api/generate', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: settings.model, system: SYSTEM_PROMPT, prompt: newsText, stream: false })
+    });
+    if (!res.ok) throw new Error('Ollama HTTP ' + res.status);
+    const j = await res.json();
+    return j.response || '';
+  }
+  const res = await fetch(ep + '/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + settings.apiKey },
+    body: JSON.stringify({ model: settings.model, messages: [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content: newsText }] })
+  });
+  if (!res.ok) throw new Error('API HTTP ' + res.status);
+  const j = await res.json();
+  return (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || '';
+}
+
+/* ============ events ============ */
+function bind() {
+  $('btnAdd').onclick = addSlide;
+  $('btnDelete').onclick = () => deleteSlide(state.current);
+  $('btnDuplicate').onclick = () => duplicateSlide(state.current);
+  $('btnPng').onclick = () => exportPNG(state.current);
+  $('btnZip').onclick = exportZIP;
+  $('btnExportJson').onclick = exportJSON;
+  $('btnImportJson').onclick = () => $('importFile').click();
+  $('importFile').onchange = e => { if (e.target.files[0]) importJSON(e.target.files[0]); e.target.value = ''; };
+
+  $('fHeadline').addEventListener('input', e => { cur().headline = e.target.value; scheduleRender(false); });
+  $('fSubtext').addEventListener('input', e => { cur().subtext = e.target.value; scheduleRender(false); });
+  $('fCredit').addEventListener('input', e => { cur().credit = e.target.value; scheduleRender(false); });
+  $('fFit').onchange = e => { cur().fit = e.target.value; scheduleRender(true); };
+  $('fFocal').oninput = e => { cur().focal = parseInt(e.target.value, 10); scheduleRender(false); };
+
+  $('fImageFile').onchange = async e => {
+    const f = e.target.files[0];
+    e.target.value = '';
+    if (!f) return;
+    try { attachDataURL(await blobToDataURL(f)); }
+    catch (err) { toast('Could not read that file.'); }
+  };
+  $('btnAttachUrl').onclick = async () => {
+    const url = $('fImageUrl').value.trim();
+    if (!url) return;
+    toast('Fetching image...');
+    try { await attachDataURL(await urlToDataURL(url)); $('fImageUrl').value = ''; toast('Image attached.'); }
+    catch (err) { toast('URL attach failed (' + err.message + '). Try uploading the file instead.'); }
+  };
+  $('btnRemoveImg').onclick = () => { cur().image = null; scheduleRender(true); };
+
+  // settings modal
+  $('btnSettings').onclick = () => {
+    $('sProvider').value = settings.provider;
+    $('sEndpoint').value = settings.endpoint;
+    $('sModel').value = settings.model;
+    $('sKey').value = settings.apiKey;
+    $('settingsModal').classList.add('open');
+  };
+  $('btnSettingsClose').onclick = () => $('settingsModal').classList.remove('open');
+  $('btnSettingsSave').onclick = () => {
+    settings = { provider: $('sProvider').value, endpoint: $('sEndpoint').value.trim(), model: $('sModel').value.trim(), apiKey: $('sKey').value.trim() };
+    try { localStorage.setItem('cps-settings', JSON.stringify(settings)); } catch (e) {}
+    $('settingsModal').classList.remove('open');
+    scheduleRender(true);
+    toast('LLM settings saved.');
+  };
+
+  // news modal
+  $('btnNews').onclick = () => { $('newsText').value = ''; $('newsModal').classList.add('open'); };
+  $('btnNewsClose').onclick = () => $('newsModal').classList.remove('open');
+  $('btnGenerate').onclick = async () => {
+    const text = $('newsText').value.trim();
+    if (!text) { toast('Paste some news text first.'); return; }
+    $('btnGenerate').disabled = true; $('btnGenerate').textContent = 'Generating...';
+    try {
+      const raw = await callLLM(text);
+      const slides = parseSlides(raw);
+      if (!slides.length) throw new Error('no slides parsed from response');
+      const firstNew = state.slides.length;
+      state.slides.push(...slides);
+      state.current = firstNew;
+      $('newsModal').classList.remove('open');
+      toast('Added ' + slides.length + ' slide' + (slides.length === 1 ? '' : 's') + '. Attach images next.');
+    } catch (err) {
+      toast('Generation failed: ' + err.message + '. Check LLM settings / Ollama running.');
+    }
+    $('btnGenerate').disabled = false; $('btnGenerate').textContent = 'Generate slides';
+    scheduleRender(true);
+  };
+
+  document.querySelectorAll('.modal-back').forEach(m => {
+    m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); });
+  });
+}
+
+/* ============ init ============ */
+loadProject();
+bind();
+renderAll();
+if (document.fonts && document.fonts.ready) {
+  document.fonts.ready.then(() => renderAll());
+}
+</script>
+</body>
+</html>
