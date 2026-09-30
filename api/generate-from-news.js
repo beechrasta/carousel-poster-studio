@@ -102,9 +102,9 @@ export default async function handler(req, res) {
         ? 'https://openrouter.ai/api/v1' 
         : (process.env.GROQ_API_KEY ? 'https://api.groq.com/openai/v1' : 'https://api.openai.com/v1')
     );
-    const model = body.model || (
+    const model = body.model || process.env.OPENROUTER_MODEL || (
       process.env.OPENROUTER_API_KEY
-        ? 'meta-llama/llama-3.3-70b-instruct'
+        ? (process.env.OPENROUTER_MODEL || 'meta-llama/llama-3.3-70b-instruct:free')
         : (process.env.GROQ_API_KEY ? 'llama-3.3-70b-versatile' : 'gpt-4o-mini')
     );
 
