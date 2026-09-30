@@ -19,8 +19,88 @@ import {
   Layout,
   ExternalLink
 } from 'lucide-react';
-import { PRESET_TEMPLATES } from '../utils/presetTemplates';
-import { POSTER_THEMES } from '../utils/canvasRenderer';
+import { PRESET_TEMPLATES, getTemplateSlideCount } from '../utils/presetTemplates';
+import { POSTER_THEMES, POSTER_LAYOUT_TEMPLATES } from '../utils/canvasRenderer';
+import TemplateMiniPreview from './TemplateMiniPreview';
+
+/**
+ * Featured template card.
+ * The preview is a real scaled down render of the composition, not a mock,
+ * so the palette swatches and the poster itself always agree.
+ */
+function TemplateCard({ tpl, onLoad }) {
+  const theme = POSTER_THEMES[tpl.themeId] || POSTER_THEMES.dark_lime;
+  const layout = POSTER_LAYOUT_TEMPLATES[tpl.templateId];
+  const slideCount = getTemplateSlideCount(tpl);
+
+  return (
+    <div
+      className="template-card"
+      role="button"
+      tabIndex={0}
+      aria-label={`Use template ${tpl.name}`}
+      title={tpl.coverTitle}
+      onClick={() => onLoad(tpl)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onLoad(tpl);
+        }
+      }}
+    >
+      <div className="template-card-frame">
+        <TemplateMiniPreview
+          template={{
+            theme,
+            templateId: tpl.templateId,
+            fontChoice: tpl.fontChoice,
+            deckSettings: tpl.deckSettings,
+            slide: tpl.slides[0],
+            totalSlides: slideCount,
+            headline: tpl.slides[0]?.headline || tpl.coverTitle,
+          }}
+        />
+
+        <div className="tpl-card-overlay">
+          <span className="tpl-card-badge" style={{ background: theme.accentColor, color: theme.id === 'clean_light' ? '#FFFFFF' : '#000000' }}>
+            {tpl.badge}
+          </span>
+          <span className="tpl-card-layout" style={{ borderColor: theme.accentColor, color: theme.accentColor }}>
+            {layout?.name || 'Classic Studio'}
+          </span>
+        </div>
+
+        <span className="tpl-card-cta" style={{ background: theme.accentColor, color: theme.id === 'clean_light' ? '#FFFFFF' : '#000000' }}>
+          Use This Template
+        </span>
+      </div>
+
+      <div className="template-card-body">
+        <div className="template-card-title-row">
+          <h3 className="template-name">{tpl.name}</h3>
+          <span className="template-category">{tpl.category}</span>
+        </div>
+
+        <p className="template-tagline">{tpl.tagline}</p>
+
+        <ul className="tpl-highlights">
+          {tpl.highlights.map((h) => (
+            <li key={h}>
+              <span className="tpl-highlight-dot" style={{ background: theme.accentColor }} />
+              {h}
+            </li>
+          ))}
+        </ul>
+
+        <div className="template-card-footer">
+          <span className="tpl-meta-chip">{slideCount} slides</span>
+          <span className="tpl-meta-chip">{POSTER_THEMES[tpl.themeId]?.name || tpl.themeId}</span>
+          <span className="tpl-meta-chip">{tpl.fontChoice}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function HomePage({
   projects,
@@ -124,51 +204,18 @@ export default function HomePage({
           <div className="section-header-row">
             <div>
               <h2 className="section-title-large">✨ Featured Poster Templates</h2>
-              <p className="section-subtitle">Click any pre-designed format to start a fresh project with styled cards &amp; themes.</p>
+              <p className="section-subtitle">
+                Every card below is a live render of the real 1080 &times; 1080 composition &mdash;
+                palette, type scale and framing included. Pick one and it drops straight into the studio.
+              </p>
             </div>
+            <span className="badge badge-dim">{PRESET_TEMPLATES.length} templates</span>
           </div>
 
           <div className="templates-grid">
-            {PRESET_TEMPLATES.map((tpl) => {
-              const th = POSTER_THEMES[tpl.themeId] || POSTER_THEMES.dark_lime;
-              return (
-                <div 
-                  key={tpl.id}
-                  className="template-card"
-                  onClick={() => onLoadTemplate(tpl)}
-                >
-                  <div 
-                    className="template-card-preview"
-                    style={{
-                      background: th.bgType === 'gradient' && th.bgGradient
-                        ? `linear-gradient(${th.bgGradient.angle || 135}deg, ${th.bgGradient.from}, ${th.bgGradient.to})`
-                        : th.bgColor
-                    }}
-                  >
-                    <div className="tpl-frame-tag" style={{ color: th.accentColor, borderColor: th.accentColor }}>
-                      FRAME 01
-                    </div>
-                    <div className="tpl-mock-headline" style={{ color: th.headlineColor }}>
-                      {tpl.coverTitle}
-                    </div>
-                    <div className="tpl-accent-line" style={{ background: th.accentColor }}></div>
-                  </div>
-
-                  <div className="template-card-body">
-                    <div className="flex justify-between items-center mb-1">
-                      <h3 className="template-name">{tpl.name}</h3>
-                      <span className="badge badge-dim">{tpl.slidesCount} slides</span>
-                    </div>
-                    <p className="template-tagline">{tpl.tagline}</p>
-                    
-                    <button className="btn btn-secondary btn-xs w-full justify-center mt-3">
-                      <span>Use This Template</span>
-                      <ArrowRight size={12} />
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
+            {PRESET_TEMPLATES.map((tpl) => (
+              <TemplateCard key={tpl.id} tpl={tpl} onLoad={onLoadTemplate} />
+            ))}
           </div>
         </section>
 

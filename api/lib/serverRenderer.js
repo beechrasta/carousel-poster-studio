@@ -20,8 +20,34 @@ try {
     ];
     for (const font of fontFiles) {
       const p = path.join(fontsDir, font.file);
-      if (fs.existsSync(p)) {
-        GlobalFonts.registerFromPath(p, font.family);
+      // Reject placeholder/truncated files. Registering one silently produces
+      // garbage glyphs, which is far worse than falling back to a real font.
+      const valid = (() => {
+        try {
+          const fd = fs.openSync(p, 'r');
+          const buf = Buffer.alloc(4);
+          const read = fs.readSync(fd, buf, 0, 4, 0);
+          fs.closeSync(fd);
+          // TrueType/OpenType/WOFF2 magic numbers
+          const tag = buf.toString('hex');
+          return read === 4 && (tag === '00010000' || tag === '74727565' || tag === '4f54544f' || tag === '774f4632');
+        } catch {
+          return false;
+        }
+      })();
+
+      if (!valid) {
+        console.warn(`Skipping invalid font file: ${font.file}`);
+        continue;
+      }
+
+      // Register the plain family name so it resolves as a generic fallback...
+      GlobalFonts.registerFromPath(p, font.family);
+      // ...and again under an explicit weight alias, otherwise multiple weights
+      // of the same family overwrite each other and `400 36px Inter` renders
+      // with fallback glyphs instead of the intended cut.
+      if (font.weight) {
+        GlobalFonts.registerFromPath(p, `${font.family} ${font.weight}`);
       }
     }
   }
@@ -32,6 +58,9 @@ try {
 export const CANVAS_SIZE = 1080;
 export const PADDING = 70;
 export const IMAGE_PANEL_HEIGHT = 400;
+
+/** Height reserved at the bottom for the image credit caption. */
+const CREDIT_RESERVE = 44;
 
 export const POSTER_THEMES = {
   dark_lime: {
@@ -191,15 +220,21 @@ function drawImagePanel(ctx, slide, img, x, y, width, height, theme, globalFit, 
     ctx.stroke();
     ctx.setLineDash([]);
 
+    // Icon & hints. Sizes scale with the panel so small panels (e.g. the 340px
+    // square in the Minimal Typo layout) don't have text overflowing the box.
+    const hintScale = Math.min(1, Math.min(width, height) / 400);
+    const labelSize = Math.max(14, Math.round(28 * hintScale));
+    const subSize = Math.max(11, Math.round(22 * hintScale));
+
     ctx.fillStyle = isLightTheme ? '#6B7280' : '#666';
-    ctx.font = '500 28px Inter, sans-serif';
+    ctx.font = `500 ${labelSize}px Inter, sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('No image attached', x + width / 2, y + height / 2 - 16);
+    ctx.fillText('No image attached', x + width / 2, y + height / 2 - labelSize * 0.6);
 
-    ctx.font = '400 22px Inter, sans-serif';
+    ctx.font = `400 ${subSize}px Inter, sans-serif`;
     ctx.fillStyle = isLightTheme ? '#9CA3AF' : '#444';
-    ctx.fillText('Upload a photo or paste an image URL', x + width / 2, y + height / 2 + 22);
+    ctx.fillText('Upload a photo or paste an image URL', x + width / 2, y + height / 2 + subSize * 1.1);
     ctx.textAlign = 'left';
     ctx.textBaseline = 'alphabetic';
   }
@@ -271,7 +306,25 @@ function resolveHeadlineFont(fontName) {
   }
 }
 
-function drawWatermark(ctx, slide, globalSettings, theme) {
+function toTitleCase(str) {
+  return String(str || '').replace(/\w\S*/g, (txt) => {
+    return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();
+  });
+}
+
+/**
+ * Formats headline string based on casing settings.
+ * Mirrors canvasRenderer.formatHeadline so server renders match the studio.
+ */
+function formatHeadline(headline, casing = 'normal') {
+  const raw = headline || '';
+  if (casing === 'uppercase') return raw.toUpperCase();
+  if (casing === 'titlecase') return toTitleCase(raw);
+  if (casing === 'lowercase') return raw.toLowerCase();
+  return raw;
+}
+
+function drawWatermark(ctx, slide, globalSettings, theme, bottomOffset = 0) {
   const text = (slide.watermarkText || globalSettings?.watermarkText || '').trim();
   const enabled = slide.watermarkEnabled != null
     ? slide.watermarkEnabled
@@ -297,7 +350,7 @@ function drawWatermark(ctx, slide, globalSettings, theme) {
   const pillH = 34;
 
   let x = CANVAS_SIZE - PADDING - pillW;
-  let y = CANVAS_SIZE - PADDING - pillH;
+  let y = CANVAS_SIZE - PADDING - pillH - bottomOffset;
 
   if (position === 'top_right') {
     x = CANVAS_SIZE - PADDING - pillW;
@@ -307,7 +360,7 @@ function drawWatermark(ctx, slide, globalSettings, theme) {
     y = PADDING + 12;
   } else if (position === 'bottom_left') {
     x = PADDING;
-    y = CANVAS_SIZE - PADDING - pillH;
+    y = CANVAS_SIZE - PADDING - pillH - bottomOffset;
   } else if (position === 'under_header') {
     x = CANVAS_SIZE - PADDING - pillW;
     y = PADDING + IMAGE_PANEL_HEIGHT + 14;
@@ -429,7 +482,19 @@ export async function renderSlideServer(slide, slideIndex = 0, globalSettings = 
   const showAccentRule = globalSettings?.globalShowAccentRule !== false;
   const activeFontName = slide.fontFamily || slide.fontChoice || globalSettings?.globalFontChoice || 'Anton';
   const fontFam = resolveHeadlineFont(activeFontName);
-  const rawHeadline = String(slide.headline || '').trim();
+  const rawHeadline = formatHeadline(slide.headline || '', globalSettings?.globalHeadlineCase || 'normal').trim();
+
+  // The credit caption sits at the bottom edge, so headline auto-shrink has to
+  // stop above it. Resolved here (before layout) so every template can use it.
+  const rawCredit = (
+    (slide.images?.length > 0 ? slide.images.map(i => i?.credit).filter(Boolean).join(', ') : '') ||
+    slide.credit || globalSettings?.globalCredit || ''
+  );
+  const showCredit = Boolean(
+    rawCredit && rawCredit.trim() && rawCredit.trim() !== 'AI Generated' && rawCredit.trim() !== 'None'
+  );
+  /** Lowest Y that body copy may occupy without colliding with the caption. */
+  const contentBottom = CANVAS_SIZE - PADDING - (showCredit ? CREDIT_RESERVE : 0);
 
   let subFontSize = 36;
   if (globalSettings?.globalSubtextSize === 'compact') subFontSize = 30;
@@ -478,12 +543,12 @@ export async function renderSlideServer(slide, slideIndex = 0, globalSettings = 
       ctx.font = `${headFontSize}px ${fontFam}`;
       headLines = wrapText(ctx, rawHeadline, maxContentWidth);
       const neededHeight = headLines.length * (headFontSize * 0.98) + gap + totalSubHeight;
-      if (headLines.length <= 4 && headTop + neededHeight <= CANVAS_SIZE - PADDING) break;
+      if (headLines.length <= 4 && headTop + neededHeight <= contentBottom) break;
       headFontSize -= 4;
     }
 
     const headLineHeight = headFontSize * 0.98;
-    const maxHeadLines = Math.max(1, Math.floor(((CANVAS_SIZE - PADDING) - headTop - gap - totalSubHeight) / headLineHeight));
+    const maxHeadLines = Math.max(1, Math.floor((contentBottom - headTop - gap - totalSubHeight) / headLineHeight));
     const allowedLines = Math.min(4, maxHeadLines);
     if (headLines.length > allowedLines) {
       headLines = headLines.slice(0, allowedLines);
@@ -526,12 +591,22 @@ export async function renderSlideServer(slide, slideIndex = 0, globalSettings = 
       curY += 4 + 20;
     }
 
+    // Subtext measured up front so the headline can be shrunk to make room
+    let hfSubLines = [];
+    if (slide.subtext) {
+      ctx.font = `400 ${subFontSize}px Inter, sans-serif`;
+      hfSubLines = wrapText(ctx, slide.subtext, maxContentWidth);
+      if (hfSubLines.length > 3) hfSubLines = hfSubLines.slice(0, 3);
+    }
+    const hfReserve = 24 + 360 + 24 + hfSubLines.length * subFontSize * 1.32;
+
     let headFontSize = 120;
     let headLines = [''];
     while (headFontSize > 54) {
       ctx.font = `${headFontSize}px ${fontFam}`;
       headLines = wrapText(ctx, rawHeadline, maxContentWidth);
-      if (headLines.length <= 3) break;
+      const fits = curY + headLines.length * headFontSize * 0.98 + hfReserve <= contentBottom;
+      if (headLines.length <= 3 && fits) break;
       headFontSize -= 4;
     }
     if (headLines.length > 3) headLines = headLines.slice(0, 3);
@@ -552,9 +627,7 @@ export async function renderSlideServer(slide, slideIndex = 0, globalSettings = 
     if (slide.subtext) {
       ctx.fillStyle = theme.subtextColor || '#D8D8D8';
       ctx.font = `400 ${subFontSize}px Inter, sans-serif`;
-      let subLines = wrapText(ctx, slide.subtext, maxContentWidth);
-      if (subLines.length > 3) subLines = subLines.slice(0, 3);
-      for (const line of subLines) {
+      for (const line of hfSubLines) {
         ctx.fillText(line, PADDING, curY);
         curY += subFontSize * 1.32;
       }
@@ -573,11 +646,39 @@ export async function renderSlideServer(slide, slideIndex = 0, globalSettings = 
     ctx.fillStyle = scrim;
     ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
 
+    // Frosted glass card hugs its measured copy and is clamped inside the
+    // canvas, so copy can never spill past the bottom edge.
     const cardX = 48;
-    const cardY = 510;
     const cardW = CANVAS_SIZE - cardX * 2;
-    const cardH = CANVAS_SIZE - cardY - 48;
     const innerPad = 36;
+    const innerContentW = cardW - innerPad * 2;
+    const cardMinY = 400;
+    const cardMaxY = CANVAS_SIZE - 48;
+
+    let headFontSize = 110;
+    let headLines = [''];
+    while (headFontSize > 50) {
+      ctx.font = `${headFontSize}px ${fontFam}`;
+      headLines = wrapText(ctx, rawHeadline, innerContentW);
+      if (headLines.length <= 3) break;
+      headFontSize -= 4;
+    }
+    if (headLines.length > 3) headLines = headLines.slice(0, 3);
+
+    let subLines = [];
+    if (slide.subtext) {
+      ctx.font = `400 ${subFontSize}px Inter, sans-serif`;
+      subLines = wrapText(ctx, slide.subtext, innerContentW);
+      if (subLines.length > 3) subLines = subLines.slice(0, 3);
+    }
+
+    const chromeH = innerPad * 2
+      + (frameText ? 36 : 0)
+      + (showAccentRule ? 24 : 0)
+      + (slide.subtext ? 18 : 0);
+    const neededH = chromeH + headLines.length * headFontSize * 0.98 + subLines.length * subFontSize * 1.32;
+    const cardH = Math.min(neededH, cardMaxY - cardMinY);
+    const cardY = cardMaxY - cardH;
 
     ctx.save();
     drawRoundedRectPath(ctx, cardX, cardY, cardW, cardH, 20);
@@ -589,7 +690,6 @@ export async function renderSlideServer(slide, slideIndex = 0, globalSettings = 
     ctx.restore();
 
     let curY = cardY + innerPad;
-    const innerContentW = cardW - innerPad * 2;
 
     if (frameText) {
       ctx.fillStyle = theme.accentColor;
@@ -604,15 +704,6 @@ export async function renderSlideServer(slide, slideIndex = 0, globalSettings = 
       curY += 4 + 20;
     }
 
-    let headFontSize = 110;
-    let headLines = [''];
-    while (headFontSize > 50) {
-      ctx.font = `${headFontSize}px ${fontFam}`;
-      headLines = wrapText(ctx, rawHeadline, innerContentW);
-      if (headLines.length <= 3) break;
-      headFontSize -= 4;
-    }
-    if (headLines.length > 3) headLines = headLines.slice(0, 3);
     const headLineHeight = headFontSize * 0.98;
 
     ctx.fillStyle = theme.headlineColor || '#FFFFFF';
@@ -626,8 +717,6 @@ export async function renderSlideServer(slide, slideIndex = 0, globalSettings = 
     if (slide.subtext) {
       ctx.fillStyle = theme.subtextColor || '#D8D8D8';
       ctx.font = `400 ${subFontSize}px Inter, sans-serif`;
-      let subLines = wrapText(ctx, slide.subtext, innerContentW);
-      if (subLines.length > 3) subLines = subLines.slice(0, 3);
       for (const line of subLines) {
         ctx.fillText(line, cardX + innerPad, curY);
         curY += subFontSize * 1.32;
@@ -649,12 +738,24 @@ export async function renderSlideServer(slide, slideIndex = 0, globalSettings = 
       curY += 38;
     }
 
+    // Subtext measured first so the headline can be shrunk to leave room for it
+    let subLines = [];
+    if (slide.subtext) {
+      ctx.font = `400 ${subFontSize}px Inter, sans-serif`;
+      subLines = wrapText(ctx, slide.subtext, maxContentWidth - 24);
+      if (subLines.length > 3) subLines = subLines.slice(0, 3);
+    }
+    const totalSubHeight = subLines.length * subFontSize * 1.34;
+
+    // Headline auto-shrink: at most 3 lines AND headline + subtext must clear
+    // the bottom safe margin, otherwise the subtext runs off the canvas.
     let headFontSize = 130;
     let headLines = [''];
     while (headFontSize > 52) {
       ctx.font = `${headFontSize}px ${fontFam}`;
       headLines = wrapText(ctx, rawHeadline, maxContentWidth);
-      if (headLines.length <= 3) break;
+      const fits = curY + headLines.length * headFontSize * 0.98 + 24 + totalSubHeight <= contentBottom;
+      if (headLines.length <= 3 && fits) break;
       headFontSize -= 4;
     }
     if (headLines.length > 3) headLines = headLines.slice(0, 3);
@@ -669,13 +770,13 @@ export async function renderSlideServer(slide, slideIndex = 0, globalSettings = 
     curY += 24;
 
     if (slide.subtext) {
+      // Accent bar tracks the actual subtext block instead of a fixed 80px,
+      // otherwise it hangs past the copy on short decks.
       ctx.fillStyle = theme.accentColor;
-      ctx.fillRect(PADDING, curY, 4, 80);
+      ctx.fillRect(PADDING, curY, 4, totalSubHeight);
 
       ctx.fillStyle = theme.subtextColor || '#D8D8D8';
       ctx.font = `400 ${subFontSize}px Inter, sans-serif`;
-      let subLines = wrapText(ctx, slide.subtext, maxContentWidth - 24);
-      if (subLines.length > 3) subLines = subLines.slice(0, 3);
       let sy = curY;
       for (const line of subLines) {
         ctx.fillText(line, PADDING + 20, sy);
@@ -716,12 +817,24 @@ export async function renderSlideServer(slide, slideIndex = 0, globalSettings = 
       curY += 46;
     }
 
+    // Subtext measured up front so the headline can be shrunk to make room
+    let cfSubLines = [];
+    if (slide.subtext) {
+      ctx.font = `400 ${subFontSize}px Inter, sans-serif`;
+      cfSubLines = wrapText(ctx, slide.subtext, contentW);
+      if (cfSubLines.length > 3) cfSubLines = cfSubLines.slice(0, 3);
+    }
+    // Content must clear both the inset frame edge and the credit caption
+    const cfReserve = 20 + cfSubLines.length * subFontSize * 1.32;
+    const cfBottom = Math.min(framePad + innerH - 36, contentBottom);
+
     let headFontSize = 120;
     let headLines = [''];
     while (headFontSize > 50) {
       ctx.font = `${headFontSize}px ${fontFam}`;
       headLines = wrapText(ctx, rawHeadline, contentW);
-      if (headLines.length <= 3) break;
+      const fits = curY + headLines.length * headFontSize * 0.98 + cfReserve <= cfBottom;
+      if (headLines.length <= 3 && fits) break;
       headFontSize -= 4;
     }
     if (headLines.length > 3) headLines = headLines.slice(0, 3);
@@ -738,9 +851,7 @@ export async function renderSlideServer(slide, slideIndex = 0, globalSettings = 
     if (slide.subtext) {
       ctx.fillStyle = theme.subtextColor || '#D8D8D8';
       ctx.font = `400 ${subFontSize}px Inter, sans-serif`;
-      let subLines = wrapText(ctx, slide.subtext, contentW);
-      if (subLines.length > 3) subLines = subLines.slice(0, 3);
-      for (const line of subLines) {
+      for (const line of cfSubLines) {
         ctx.fillText(line, contentX, curY);
         curY += subFontSize * 1.32;
       }
@@ -765,12 +876,16 @@ export async function renderSlideServer(slide, slideIndex = 0, globalSettings = 
       curY += 40;
     }
 
+    // Dominant Headline: shrink until it clears the bottom photo row
+    // Dominant Headline: shrink until it leaves room for the photo row below
+    const quoteReserve = slide.subtext ? 36 + 240 : 0;
     let headFontSize = 136;
     let headLines = [''];
     while (headFontSize > 54) {
       ctx.font = `${headFontSize}px ${fontFam}`;
       headLines = wrapText(ctx, rawHeadline, maxContentWidth);
-      if (headLines.length <= 3) break;
+      const fits = curY + headLines.length * headFontSize * 0.98 + quoteReserve <= contentBottom;
+      if (headLines.length <= 3 && fits) break;
       headFontSize -= 4;
     }
     if (headLines.length > 3) headLines = headLines.slice(0, 3);
@@ -784,12 +899,15 @@ export async function renderSlideServer(slide, slideIndex = 0, globalSettings = 
     }
     curY += 36;
 
-    const bottomPhotoSize = 340;
-    drawImagePanel(ctx, slide, img, PADDING, curY, bottomPhotoSize, bottomPhotoSize, theme, globalSettings?.globalImageFit, 16);
+    // Bottom Split: Square Photo on Left, Subtext on Right.
+    // The photo grows to fill whatever vertical space is left, so the layout
+    // stays balanced whether the headline shrank or not.
+    const photoSize = Math.max(240, Math.min(520, contentBottom - curY));
+    drawImagePanel(ctx, slide, img, PADDING, curY, photoSize, photoSize, theme, globalSettings?.globalImageFit, 16);
 
     if (slide.subtext) {
-      const rightColX = PADDING + bottomPhotoSize + 32;
-      const rightColW = maxContentWidth - bottomPhotoSize - 32;
+      const rightColX = PADDING + photoSize + 32;
+      const rightColW = maxContentWidth - photoSize - 32;
 
       ctx.fillStyle = theme.accentColor;
       drawRoundedRectPath(ctx, rightColX, curY, 40, 4, 2);
@@ -966,18 +1084,21 @@ export async function renderSlideServer(slide, slideIndex = 0, globalSettings = 
     for (const line of headLinesC3) { ctx.fillText(line, PADDING, curY); curY += headFontSizeC3 * 0.98; }
   }
 
-  const creditText = (
-    (slide.images?.length > 0 ? slide.images.map(i => i?.credit).filter(Boolean).join(', ') : '') ||
-    slide.credit || globalSettings?.globalCredit || ''
-  );
-
-  if (creditText && creditText.trim() && creditText.trim() !== 'AI Generated' && creditText.trim() !== 'None') {
+  if (showCredit) {
+    // Full-bleed compositions would otherwise print this over the glass card,
+    // so it tucks to the top edge where the photo is always clear.
+    const onGlassCard = templateId === 'hero_fullbleed';
     ctx.fillStyle = theme.creditColor || '#666666';
     ctx.font = '400 20px Inter, sans-serif';
-    ctx.fillText('Img: ' + creditText.trim(), PADDING, CANVAS_SIZE - PADDING - 24);
+    ctx.fillText(
+      'Img: ' + rawCredit.trim(),
+      PADDING,
+      onGlassCard ? PADDING : CANVAS_SIZE - PADDING - 24
+    );
   }
 
-  drawWatermark(ctx, slide, globalSettings, theme);
+  // Bottom-anchored marks are lifted above the credit caption so they never stack
+  drawWatermark(ctx, slide, globalSettings, theme, showCredit ? CREDIT_RESERVE : 0);
 
   return canvas;
 }

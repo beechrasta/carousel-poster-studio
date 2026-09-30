@@ -13,7 +13,8 @@ import BackgroundTaskBar from './components/BackgroundTaskBar';
 import ApiConnectorModal from './components/ApiConnectorModal';
 import AppLockScreen, { isStudioAuthenticated, lockStudio } from './components/AppLockScreen';
 
-import { ensureFontsReady, POSTER_THEMES, THEME_KEYS } from './utils/canvasRenderer';
+import { ensureFontsReady, POSTER_THEMES, THEME_KEYS, POSTER_LAYOUT_TEMPLATES } from './utils/canvasRenderer';
+import { buildTemplateSlides, buildTemplateDeckSettings } from './utils/presetTemplates';
 import { saveSlidesToFolder } from './utils/exportEngine';
 import { 
   DEFAULT_SETTINGS, 
@@ -706,17 +707,15 @@ export default function App() {
   const handleLoadTemplate = (template) => {
     setUndoStack([]);
     setRedoStack([]);
-    const newProj = createProject(template.name, template.slides);
-    newProj.globalSettings = {
-      ...DEFAULT_GLOBAL_SETTINGS,
-      globalThemeId: template.themeId || 'clean_light',
-      themeMode: 'uniform',
-    };
+    // Templates carry a full deck recipe: theme + poster composition + type
+    // scale + framing defaults, not just a colour swap.
+    const newProj = createProject(template.name, buildTemplateSlides(template, uid));
+    newProj.globalSettings = buildTemplateDeckSettings(template, DEFAULT_GLOBAL_SETTINGS);
     saveCurrentProject(newProj);
     setProjects(getAllProjects());
     setActiveId(newProj.id);
     setCurrentView('studio');
-    showToast(`Loaded template "${template.name}".`);
+    showToast(`Loaded "${template.name}" — ${POSTER_LAYOUT_TEMPLATES[template.templateId]?.name || 'poster layout'} ready.`);
   };
 
   const handleDuplicateProject = (id) => {

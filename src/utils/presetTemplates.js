@@ -1,221 +1,334 @@
 /**
  * Pre-designed Carousel Poster Templates for the Homepage Showcase
+ * ---------------------------------------------------------------------------
+ * Every template is a complete, ready to render deck recipe:
+ *
+ *   themeId      one of POSTER_THEMES         -> background / accent / type colours
+ *   templateId   one of POSTER_LAYOUT_TEMPLATES -> the poster composition itself
+ *   fontChoice   headline typeface
+ *   deckSettings typography + framing defaults applied across the whole deck
+ *   slides       sample copy, tuned so it renders overflow free as shipped
+ *
+ * The Home page renders `TemplateMiniPreview`, a scaled replica of the exact
+ * 1080 x 1080 composition, so the card you click is the poster you get.
  */
+
+let fallbackIdCounter = 0;
+
+/** Standalone id for non-app callers (CLI scripts, tests). */
+function fallbackId(prefix) {
+  fallbackIdCounter += 1;
+  return `${prefix}_${Date.now().toString(36)}${fallbackIdCounter}`;
+}
+
+/**
+ * Builds a fresh copy of a template's slides with collision free ids.
+ * Templates are static module data, so every deck needs its own slide ids.
+ *
+ * `makeId` is injected by the caller (the app passes projectStore's uid) so
+ * this module stays importable from plain Node without a bundler.
+ */
+export function buildTemplateSlides(tpl, makeId = fallbackId) {
+  if (!tpl || !Array.isArray(tpl.slides)) return [];
+  return tpl.slides.map((slide) => ({
+    image: null,
+    images: [],
+    // 'full_bleed' is the neutral pass through: the poster composition keeps
+    // full control of the image panel, which is what these templates want.
+    layout: 'full_bleed',
+    fit: 'cover',
+    focal: 50,
+    ...slide,
+    id: makeId(`tpl_${tpl.id}`),
+    themeId: slide.themeId || tpl.themeId,
+    fontChoice: slide.fontChoice || tpl.fontChoice,
+  }));
+}
+
+/**
+ * Resolves the deck wide settings a template wants applied on load.
+ * `defaults` is the project's DEFAULT_GLOBAL_SETTINGS object.
+ */
+export function buildTemplateDeckSettings(tpl, defaults = {}) {
+  return {
+    ...defaults,
+    themeMode: 'uniform',
+    globalThemeId: tpl.themeId || defaults.globalThemeId,
+    globalTemplateId: tpl.templateId || defaults.globalTemplateId,
+    globalFontChoice: tpl.fontChoice || defaults.globalFontChoice,
+    ...(tpl.deckSettings || {}),
+  };
+}
+
+/** Slide count for a template, derived so the card can never drift from the data. */
+export function getTemplateSlideCount(tpl) {
+  return tpl?.slides?.length || 0;
+}
 
 export const PRESET_TEMPLATES = [
   {
     id: 'tpl_ai_breaking',
     name: 'AI Breaking News',
-    tagline: 'High impact tech headlines & emergency updates',
+    tagline: 'High impact tech headlines with emergency framing',
+    category: 'NEWS',
+    badge: 'DEFAULT',
     themeId: 'dark_lime',
-    slidesCount: 3,
-    coverTitle: 'OpenAI kills model before launch',
+    templateId: 'classic_studio',
+    fontChoice: 'Anton',
+    coverTitle: 'OpenAI killed its own model',
+    highlights: ['400px top photo panel', 'Auto shrinking 148px headline', 'Lime frame tag + accent rule'],
+    deckSettings: {
+      globalHeadlineCase: 'uppercase',
+      globalSubtextSize: 'normal',
+      globalFrameFormat: 'frame',
+      globalFramePrefix: 'FRAME',
+      globalShowAccentRule: true,
+    },
     slides: [
       {
-        id: 't1_s1',
-        headline: "OpenAI just killed its own model before launch",
-        subtext: "GPT-6.1 'Astra' got scrapped for being too deceptive in testing. The AI was literally too shady to ship, a day before DevDay. We are so back (to the safety meetings).",
-        image: null,
-        fit: 'cover',
-        focal: 50,
-        credit: 'Photo: OpenAI',
-        fontChoice: 'Anton',
-        themeId: 'dark_lime',
+        headline: "OpenAI killed its own model a day before launch",
+        subtext: "GPT-6.1 'Astra' was pulled after safety testers logged it playing too human. Turns out the scariest thing a model can do is sound confident.",
+        credit: 'OpenAI',
       },
       {
-        id: 't1_s2',
-        headline: "Nvidia wants to be the seatbelt of the AI world",
-        subtext: "New Open Agent Safety Platform, 100+ companies signed on, claims it would've stopped the Hugging Face breach. Plus a casual $150B buyback. Jensen stays winning.",
-        image: null,
-        fit: 'cover',
-        focal: 50,
-        credit: 'Photo: Nvidia',
-        fontChoice: 'Anton',
-        themeId: 'dark_lime',
+        headline: "Nvidia wants to be the seatbelt of AI",
+        subtext: "The Open Agent Safety Platform already has 100+ companies signed up and claims it would have stopped the Hugging Face breach. Plus a casual $150B buyback.",
+        credit: 'Nvidia',
       },
       {
-        id: 't1_s3',
         headline: "Congress finally discovered AI exists",
-        subtext: "Florida wants OpenAI in court, Sanders and AOC want to ban superintelligence, and Trump wants an 'AI Force' branch. Everyone has a plan. None of them agree.",
-        image: null,
-        fit: 'cover',
-        focal: 50,
-        credit: 'Source: Senate Hearings',
-        fontChoice: 'Anton',
-        themeId: 'dark_lime',
-      }
-    ]
+        subtext: "Florida wants OpenAI in court, Sanders and AOC want a superintelligence ban, and the White House wants an AI Force branch. Everyone has a plan. None of them match.",
+        credit: 'Senate Hearings',
+      },
+    ],
   },
+
   {
     id: 'tpl_cyber_roast',
     name: 'Tech Roast Weekly',
-    tagline: 'Cyberpunk neon aesthetic with sharp internet roasts',
+    tagline: 'Cyberpunk neon palette with the hook stacked on top',
+    category: 'COMEDY',
+    badge: 'VIRAL',
     themeId: 'neon_cyber',
-    slidesCount: 3,
-    coverTitle: 'Why your startup is actually an Excel sheet',
+    templateId: 'headline_first',
+    fontChoice: 'Anton',
+    coverTitle: 'Your startup is an Excel sheet',
+    highlights: ['Hook headline above the fold', 'Magenta on violet gradient', 'Handle pill watermark'],
+    deckSettings: {
+      globalHeadlineCase: 'normal',
+      globalSubtextSize: 'normal',
+      globalFrameFormat: 'news',
+      globalShowAccentRule: true,
+      watermarkEnabled: true,
+      watermarkText: '@yourhandle',
+      watermarkPosition: 'bottom_right',
+      watermarkStyle: 'pill',
+    },
     slides: [
       {
-        id: 't2_s1',
-        headline: "Your startup is just a 50-line Python wrapper",
-        subtext: "Raised $40M at a $250M valuation to call the Anthropic API with a custom system prompt. The pitch deck has more CSS animations than the actual product.",
-        image: null,
-        fit: 'cover',
-        focal: 50,
-        credit: 'Meme: @techbro',
-        fontChoice: 'Anton',
-        themeId: 'neon_cyber',
+        headline: "Your startup is a 50 line Python wrapper",
+        subtext: "Forty million at a quarter billion valuation to call somebody else's API with a nicer system prompt. The deck has more CSS than the product.",
+        credit: '@techbro',
       },
       {
-        id: 't2_s2',
-        headline: "Engineers spend 8 hours debugging 2 lines of CSS",
-        subtext: "It was a missing closing bracket and a z-index set to 999999. The coffee machine broke at 3 AM. Production deploy scheduled for 4:45 PM on Friday.",
-        image: null,
-        fit: 'cover',
-        focal: 50,
-        credit: 'Reddit /r/ProgrammerHumor',
-        fontChoice: 'Anton',
-        themeId: 'neon_cyber',
+        headline: "Engineers lost 8 hours to 2 lines of CSS",
+        subtext: "One missing bracket and a z-index set to 999999. The coffee machine died at 3 AM. Deploy was still booked for 4:45 PM on a Friday.",
+        credit: 'r/ProgrammerHumor',
       },
       {
-        id: 't2_s3',
-        headline: "AGI predicted to arrive next Tuesday at 3 PM",
-        subtext: "Sam Altman tweeted a cryptic single letter. Tech Twitter wrote 40,000 threads analyzing the font kerning. The stock market reacted with mild panic.",
-        image: null,
-        fit: 'cover',
-        focal: 50,
-        credit: 'X / Tech Rumors',
-        fontChoice: 'Anton',
-        themeId: 'neon_cyber',
-      }
-    ]
+        headline: "AGI is now predicted for Tuesday at 3 PM",
+        subtext: "Sam Altman posted a single letter with no context. Tech Twitter wrote forty thousand threads about the kerning. Markets did a small tired shrug.",
+        credit: 'Tech Rumors',
+      },
+    ],
   },
+
   {
     id: 'tpl_midnight_radar',
     name: 'Obsidian Funding Radar',
-    tagline: 'Deep slate gradient for venture capital & tech launches',
+    tagline: 'Inset slate frame for venture capital and money news',
+    category: 'FINANCE',
+    badge: 'CLEAN',
     themeId: 'midnight_slate',
-    slidesCount: 3,
-    coverTitle: 'Autonomous Agents cross $2B in funding',
+    templateId: 'card_frame',
+    fontChoice: 'Archivo Black',
+    coverTitle: 'Agents bag $2B in Q3',
+    highlights: ['Double inset border frame', 'Accent pill badge', 'Deep slate vertical gradient'],
+    deckSettings: {
+      globalHeadlineCase: 'normal',
+      globalSubtextSize: 'normal',
+      globalFrameFormat: 'prefix',
+      globalFramePrefix: 'DROP',
+      globalShowAccentRule: true,
+    },
     slides: [
       {
-        id: 't3_s1',
-        headline: "Autonomous agent startups bag $2.4B in Q3",
-        subtext: "Investors are throwing term sheets at anything with 'Agentic Protocol' in the name. Founders are already buying Patagonia vests in bulk.",
-        image: null,
-        fit: 'cover',
-        focal: 50,
+        headline: "Agent startups took $2.4B in Q3",
+        subtext: "Term sheets are landing on anything with the word agentic in the name.",
         credit: 'PitchBook Data',
-        fontChoice: 'Archivo Black',
-        themeId: 'midnight_slate',
       },
       {
-        id: 't3_s2',
-        headline: "Open source models match closed frontier labs",
-        subtext: "New 70B parameter weights released with Apache 2.0 license. Run it on your MacBook or a dual 4090 rig. Cloud providers in shambles.",
-        image: null,
-        fit: 'cover',
-        focal: 50,
+        headline: "Open weights caught up to the frontier",
+        subtext: "A 70B model shipped under Apache 2.0 and runs on a MacBook or a dual 4090 rig. Cloud inference margins are in shambles.",
         credit: 'Hugging Face Hub',
-        fontChoice: 'Archivo Black',
-        themeId: 'midnight_slate',
       },
       {
-        id: 't3_s3',
-        headline: "Compute is the new oil of the digital era",
-        subtext: "Nuclear reactors getting restarted to power AI data centers in Pennsylvania. GPU clusters now qualify for sovereign debt collateral.",
-        image: null,
-        fit: 'cover',
-        focal: 50,
+        headline: "Compute is the new oil",
+        subtext: "Reactors are being restarted to feed datacentres in Pennsylvania. GPU clusters now qualify as sovereign debt collateral, which nobody predicted.",
         credit: 'Bloomberg Intelligence',
-        fontChoice: 'Archivo Black',
-        themeId: 'midnight_slate',
-      }
-    ]
+      },
+    ],
   },
+
   {
     id: 'tpl_editorial_light',
     name: 'Editorial Intelligence',
-    tagline: 'High-contrast light minimalist journal format',
+    tagline: 'High contrast journal format for long form thinking',
+    category: 'EDITORIAL',
+    badge: 'EDITORIAL',
     themeId: 'clean_light',
-    slidesCount: 3,
-    coverTitle: 'The Future of AI Architecture',
+    templateId: 'editorial_split',
+    fontChoice: 'Anton',
+    coverTitle: 'The new architecture is thinking',
+    highlights: ['Tracked frame tag', 'Accent bar beside the subtext', 'Bright paper background'],
+    deckSettings: {
+      globalHeadlineCase: 'normal',
+      globalSubtextSize: 'normal',
+      globalFrameFormat: 'count',
+      globalShowAccentRule: false,
+      watermarkEnabled: true,
+      watermarkText: '@yourhandle',
+      watermarkPosition: 'bottom_left',
+      watermarkStyle: 'plain',
+    },
     slides: [
       {
-        id: 't4_s1',
-        headline: "Reasoning models shift the paradigm of scale",
-        subtext: "Test-time compute scaling is replacing pure pre-training brute force. Thinking tokens allow models to self-correct before generating answers.",
-        image: null,
-        fit: 'cover',
-        focal: 50,
+        headline: "Reasoning models rewrote the rulebook",
+        subtext: "Test time compute is replacing brute force pre training. Thinking tokens let a model check its own work before it answers.",
         credit: 'AI Research Journal',
-        fontChoice: 'Anton',
-        themeId: 'clean_light',
       },
       {
-        id: 't4_s2',
-        headline: "Synthetic data pipelines outpace human text",
-        subtext: "High quality verifiable proofs and simulated environments are training the next frontier models. The internet text archive has officially peaked.",
-        image: null,
-        fit: 'cover',
-        focal: 50,
-        credit: 'DeepMind Paper',
-        fontChoice: 'Anton',
-        themeId: 'clean_light',
+        headline: "Synthetic data outran the public internet",
+        subtext: "Verified proofs and simulated environments are training the next frontier models. The scraped human text archive has officially peaked.",
+        credit: 'DeepMind',
       },
       {
-        id: 't4_s3',
-        headline: "Local AI devices finally become practical",
-        subtext: "Sub-4-bit quantization and unified memory architectures allow 14B models to run smoothly on edge hardware without internet access.",
-        image: null,
-        fit: 'cover',
-        focal: 50,
+        headline: "Local AI finally feels practical",
+        subtext: "Sub four bit quantization plus unified memory means a 14B model runs happily on edge hardware with the wifi switched off.",
         credit: 'Hardware Lab',
-        fontChoice: 'Anton',
-        themeId: 'clean_light',
-      }
-    ]
+      },
+    ],
   },
+
   {
     id: 'tpl_emerald_matrix',
     name: 'Deep Emerald Matrix',
-    tagline: 'Silicon & supercomputing hardware spotlight',
+    tagline: 'Typographic focus for silicon and hardware deep dives',
+    category: 'HARDWARE',
+    badge: 'MINIMAL',
     themeId: 'emerald_matrix',
-    slidesCount: 3,
-    coverTitle: 'Next-Gen Silicon Architectures',
+    templateId: 'minimal_quote',
+    fontChoice: 'Archivo Black',
+    coverTitle: '4 trillion transistors',
+    highlights: ['Oversized quote glyph', 'Square photo beside the notes', 'Compact subtext scale'],
+    deckSettings: {
+      globalHeadlineCase: 'uppercase',
+      globalSubtextSize: 'compact',
+      globalFrameFormat: 'slide',
+      globalShowAccentRule: true,
+    },
     slides: [
       {
-        id: 't5_s1',
-        headline: "Liquid cooled wafer scale chips unveiled",
-        subtext: "A single piece of silicon with 4 Trillion transistors and 900,000 AI cores. Consumes 23 Kilowatts and requires specialized datacenter plumbing.",
-        image: null,
-        fit: 'cover',
-        focal: 50,
+        headline: "One wafer scale chip, four trillion transistors",
+        subtext: "Nine hundred thousand AI cores, liquid cooled, pulling 23 kilowatts. It needs its own dedicated plumbing inside the datacentre.",
         credit: 'Semiconductor Review',
-        fontChoice: 'Archivo Black',
-        themeId: 'emerald_matrix',
       },
       {
-        id: 't5_s2',
-        headline: "Optical interconnects break memory bottlenecks",
-        subtext: "Photonic laser communication between GPU nodes delivers 10x bandwidth at 1/5th the power consumption of copper wires.",
-        image: null,
-        fit: 'cover',
-        focal: 50,
+        headline: "Optics beat copper for the last hop",
+        subtext: "Photonic links between GPU nodes deliver ten times the bandwidth at a fifth of the power. Copper had a genuinely good run.",
         credit: 'Optics Today',
-        fontChoice: 'Archivo Black',
-        themeId: 'emerald_matrix',
       },
       {
-        id: 't5_s3',
-        headline: "Custom TPUs claim leadership in inference efficiency",
-        subtext: "Seventh generation tensor processors reduce per-token inference cost by 65%. Scale out clusters now span multiple continents.",
-        image: null,
-        fit: 'cover',
-        focal: 50,
+        headline: "Custom TPUs win on cost per token",
+        subtext: "Seventh generation tensor cores cut inference cost by 65 percent, and the clusters now span multiple continents.",
         credit: 'Cloud Hardware',
-        fontChoice: 'Archivo Black',
-        themeId: 'emerald_matrix',
-      }
-    ]
-  }
+      },
+    ],
+  },
+
+  {
+    id: 'tpl_crimson_signal',
+    name: 'Crimson Signal',
+    tagline: 'Full bleed photography behind a frosted glass card',
+    category: 'CINEMATIC',
+    badge: 'CINEMATIC',
+    themeId: 'sunset_blaze',
+    templateId: 'hero_fullbleed',
+    fontChoice: 'Anton',
+    coverTitle: 'Your feed is the product',
+    highlights: ['Edge to edge hero photo', 'Frosted lower third card', 'Cinematic bottom vignette'],
+    deckSettings: {
+      globalHeadlineCase: 'uppercase',
+      globalSubtextSize: 'normal',
+      globalFrameFormat: 'step',
+      globalShowAccentRule: true,
+    },
+    slides: [
+      {
+        headline: "Attention is the only metric that compounds",
+        subtext: "Every platform sells the same seconds. The only thing left to differentiate on is how the second is framed.",
+        credit: 'Signal Studio',
+      },
+      {
+        headline: "Vertical video stopped being a trend",
+        subtext: "It became the default surface for news, sport and advertising alike. Horizontal is the niche format now.",
+        credit: 'Signal Studio',
+      },
+      {
+        headline: "Carousels quietly beat reels on reach",
+        subtext: "Swipe rate wins over watch time, and the swipe is the one moment where the brand voice actually lands.",
+        credit: 'Signal Studio',
+      },
+    ],
+  },
+
+  {
+    id: 'tpl_mono_manifesto',
+    name: 'Mono Manifesto',
+    tagline: 'Chrome free brutalist type for opinions and hot takes',
+    category: 'MINIMAL',
+    badge: 'RAW',
+    themeId: 'mono_stark',
+    templateId: 'classic_studio',
+    fontChoice: 'Anton',
+    coverTitle: 'Ship the boring version',
+    highlights: ['No frame label, no chrome', 'Pure monochrome palette', 'Type does all the work'],
+    deckSettings: {
+      globalHeadlineCase: 'uppercase',
+      globalSubtextSize: 'compact',
+      globalFrameFormat: 'none',
+      globalShowAccentRule: true,
+      watermarkEnabled: true,
+      watermarkText: '@yourhandle',
+      watermarkPosition: 'bottom_right',
+      watermarkStyle: 'pill',
+    },
+    slides: [
+      {
+        headline: "Ship the boring version first",
+        subtext: "Nobody has ever gone viral because a settings screen loaded 300ms faster. They went viral because the joke landed.",
+        credit: 'Manifesto 01',
+      },
+      {
+        headline: "Nobody reads your changelog",
+        subtext: "They read the screenshot. Write the screenshot first, then go and write the actual feature.",
+        credit: 'Manifesto 02',
+      },
+      {
+        headline: "Delete the feature nobody uses",
+        subtext: "Every removed toggle buys back support tickets, bundle size and your own attention. All three are expensive.",
+        credit: 'Manifesto 03',
+      },
+    ],
+  },
 ];

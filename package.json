@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "render:cli": "node scripts/generate.js",
-    "render:example": "node scripts/generate.js --file examples/carousel.json --out ./dist-posters"
+    "render:example": "node scripts/generate.js --file examples/carousel.json --out ./dist-posters",
+    "render:presets": "node scripts/render-presets.js"
   },
   "dependencies": {
     "@napi-rs/canvas": "^1.0.9",
