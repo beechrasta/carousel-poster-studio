@@ -10,10 +10,18 @@ describe('Undo, Redo, Reset Preferences, and Clear All Features', () => {
     vi.spyOn(window, 'confirm').mockImplementation(() => true);
   });
 
-  it('renders Undo and Redo buttons in the header and stage with disabled state initially', async () => {
+  const renderStudio = async () => {
     await act(async () => {
       render(<App />);
     });
+    const studioBtn = screen.getByTitle(/Go to Canvas Poster Studio Editor/i);
+    await act(async () => {
+      fireEvent.click(studioBtn);
+    });
+  };
+
+  it('renders Undo and Redo buttons in the header and stage with disabled state initially', async () => {
+    await renderStudio();
 
     const undoBtns = screen.getAllByTitle(/Undo last action/i);
     const redoBtns = screen.getAllByTitle(/Redo action/i);
@@ -25,9 +33,7 @@ describe('Undo, Redo, Reset Preferences, and Clear All Features', () => {
   });
 
   it('enables undo button when a slide is added, and undos back to previous state', async () => {
-    await act(async () => {
-      render(<App />);
-    });
+    await renderStudio();
 
     const undoBtns = screen.getAllByTitle(/Undo last action/i);
     expect(undoBtns[0]).toBeDisabled();
@@ -66,9 +72,7 @@ describe('Undo, Redo, Reset Preferences, and Clear All Features', () => {
   });
 
   it('handles Ctrl+Z and Ctrl+Y keyboard shortcuts for undo and redo', async () => {
-    await act(async () => {
-      render(<App />);
-    });
+    await renderStudio();
 
     // Add a slide
     const addSlideBtn = screen.getByText(/Add New Slide/i);
@@ -91,9 +95,7 @@ describe('Undo, Redo, Reset Preferences, and Clear All Features', () => {
   });
 
   it('resets all preferences to clean defaults via Actions menu', async () => {
-    await act(async () => {
-      render(<App />);
-    });
+    await renderStudio();
 
     // Open Actions dropdown in header
     const actionsBtn = screen.getByTitle(/Deck Actions/i);
@@ -112,9 +114,7 @@ describe('Undo, Redo, Reset Preferences, and Clear All Features', () => {
   });
 
   it('clears all slides and resets to 1 fresh blank slide, with ability to undo', async () => {
-    await act(async () => {
-      render(<App />);
-    });
+    await renderStudio();
 
     expect(screen.getByText(/3 slides/i)).toBeInTheDocument();
 
@@ -144,9 +144,7 @@ describe('Undo, Redo, Reset Preferences, and Clear All Features', () => {
   });
 
   it('renders Bulk Deck Utilities in Global Settings tab with reset and clear buttons', async () => {
-    await act(async () => {
-      render(<App />);
-    });
+    await renderStudio();
 
     // Switch to Global Settings tab
     const globalTabBtn = screen.getByTitle(/Edit project-wide themes/i);

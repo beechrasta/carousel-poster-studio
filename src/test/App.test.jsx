@@ -8,22 +8,33 @@ describe('Carousel Poster Studio Frontend App Component', () => {
     localStorage.clear();
   });
 
-  it('renders the header with app title, project button, and view switcher', async () => {
+  it('renders the header with app title, project button, and view switcher on the Home view by default', async () => {
     await act(async () => {
       render(<App />);
     });
     
     expect(screen.getAllByText(/CAROUSEL POSTER STUDIO/i).length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText(/1080/i).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText(/All-At-Once Builder/i)).toBeInTheDocument();
-    expect(screen.getByText(/News → Slides/i)).toBeInTheDocument();
-    expect(screen.getByText(/Save All/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/All-At-Once Builder/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/News → Slides/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/Save All/i).length).toBeGreaterThanOrEqual(1);
+
+    // Verify Home view elements are visible by default
+    expect(screen.getByText(/Turn AI & Tech News Into/i)).toBeInTheDocument();
+    expect(screen.getByText(/Featured Poster Templates/i)).toBeInTheDocument();
   });
 
-  it('switches to Home dashboard and displays featured poster templates', async () => {
+  it('switches between Home dashboard and Studio editor via view switcher pill', async () => {
     await act(async () => {
       render(<App />);
     });
+
+    const studioBtn = screen.getByTitle(/Go to Canvas Poster Studio Editor/i);
+    await act(async () => {
+      fireEvent.click(studioBtn);
+    });
+
+    expect(screen.getByText(/Add New Slide/i)).toBeInTheDocument();
 
     const homeBtn = screen.getByTitle(/Go to Home & Templates Dashboard/i);
     await act(async () => {
@@ -43,8 +54,9 @@ describe('Carousel Poster Studio Frontend App Component', () => {
     // Default theme is light
     expect(document.documentElement.getAttribute('data-theme')).toBe('light');
 
-    const themeBtn = screen.getByTitle(/Switch to Light Mode|Switch to Dark Mode/i);
-    expect(themeBtn).toBeInTheDocument();
+    const themeBtns = screen.getAllByTitle(/Switch to Light Mode|Switch to Dark Mode/i);
+    expect(themeBtns.length).toBeGreaterThanOrEqual(1);
+    const themeBtn = themeBtns[0];
 
     await act(async () => {
       fireEvent.click(themeBtn);
@@ -71,9 +83,14 @@ describe('Carousel Poster Studio Frontend App Component', () => {
     expect(screen.getByText(/Create New Poster Project/i)).toBeInTheDocument();
   });
 
-  it('allows adding a new slide to the deck', async () => {
+  it('allows switching to Studio and adding a new slide to the deck', async () => {
     await act(async () => {
       render(<App />);
+    });
+
+    const studioBtn = screen.getByTitle(/Go to Canvas Poster Studio Editor/i);
+    await act(async () => {
+      fireEvent.click(studioBtn);
     });
 
     const addSlideBtn = screen.getByText(/Add New Slide/i);

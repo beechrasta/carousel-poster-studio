@@ -62,7 +62,7 @@ export const DEFAULT_GLOBAL_SETTINGS = {
 
 export default function App() {
   // Navigation view: 'home' | 'studio'
-  const [currentView, setCurrentView] = useState('studio');
+  const [currentView, setCurrentView] = useState('home');
 
   // Inspector tab mode: 'slide' | 'global'
   const [editorTab, setEditorTab] = useState('slide');
