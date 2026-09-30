@@ -168,13 +168,26 @@ export default async function handler(req, res) {
 
     for (let i = 0; i < totalSlides; i++) {
       const story = parsedStories[i];
-      const slideImg = images[i] || (images.length === 1 ? images[0] : null);
+      let slideImg = images[i] || (images.length === 1 ? images[0] : null);
+
+      // If no image passed and autoImage is not disabled, generate relevant AI photo
+      if (!slideImg && body.autoImage !== false) {
+        const cleanKeywords = String(story.headline || 'artificial intelligence technology')
+          .replace(/[\*\#\_\`\:\–\—]/g, '')
+          .replace(/[^\w\s]/gi, '')
+          .trim()
+          .split(/\s+/)
+          .slice(0, 6)
+          .join(' ');
+        const prompt = encodeURIComponent(`${cleanKeywords} modern tech editorial photograph cinematic lighting`);
+        slideImg = `https://image.pollinations.ai/prompt/${prompt}?width=1200&height=675&nologo=true&seed=${i * 17 + 101}`;
+      }
 
       const slide = {
-        headline: story.headline,
+        headline: story.headline.replace(/^\*+|\*+$/g, ''),
         subtext: story.subtext,
         image: slideImg,
-        credit: story.credit || '',
+        credit: story.credit || (slideImg?.includes('pollinations.ai') ? 'AI Generated' : ''),
         frameLabel: `FRAME ${String(i + 1).padStart(2, '0')}`,
         theme,
         template
