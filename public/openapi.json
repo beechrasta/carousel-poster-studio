@@ -7,11 +7,11 @@
   },
   "servers": [
     {
-      "url": "https://carousel-poster-studio.vercel.app",
+      "url": "https://posterbuilder.vercel.app",
       "description": "Production Vercel Server"
     },
     {
-      "url": "http://localhost:3000",
+      "url": "http://localhost:5173",
       "description": "Local Development Server"
     }
   ],
