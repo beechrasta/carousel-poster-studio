@@ -24,3 +24,5 @@ Thumbs.db
 !.vscode/extensions.json
 dist-posters/
 output-posters/
+
+.vercel
