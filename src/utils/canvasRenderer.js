@@ -1186,7 +1186,7 @@ export async function renderSlideToCanvas(slide, slideIndex = 0, targetCanvas = 
     slide.credit || globalSettings?.globalCredit || ''
   );
 
-  if (creditText && creditText.trim()) {
+  if (creditText && creditText.trim() && creditText.trim() !== 'AI Generated' && creditText.trim() !== 'None') {
     ctx.fillStyle = theme.creditColor || '#666666';
     ctx.font = '400 20px Inter, sans-serif';
     ctx.fillText('Img: ' + creditText.trim(), PADDING, CANVAS_SIZE - PADDING - 24);

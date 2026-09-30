@@ -121,6 +121,21 @@ export function extractStoriesHeuristic(rawText) {
   return stories;
 }
 
+export function cleanCopyText(str) {
+  if (!str) return '';
+  let s = String(str)
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/\*(.*?)\*/g, '$1')
+    .replace(/__(.*?)__/g, '$1')
+    .replace(/_(.*?)_/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/^[\*\#\-\•\>\s]+/gm, '')
+    .replace(/[\*\#\`]/g, '')
+    .trim();
+  s = s.replace(/^["'`“”\s]+|["'`“”\s]+$/g, '').trim();
+  return s;
+}
+
 /**
  * Parses raw text from LLM response into an array of { headline, subtext } objects.
  */
@@ -133,8 +148,8 @@ export function parseStoriesFromResponse(text) {
   let match;
 
   while ((match = regex.exec(text)) !== null) {
-    const headline = match[1].trim().replace(/^["'`]|["'`]$/g, '').replace(/[\r\n]+/g, ' ');
-    const subtext = match[2].trim().replace(/^["'`]|["'`]$/g, '');
+    const headline = cleanCopyText(match[1].replace(/[\r\n]+/g, ' '));
+    const subtext = cleanCopyText(match[2]);
     if (headline) {
       results.push({
         headline,

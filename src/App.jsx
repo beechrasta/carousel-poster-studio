@@ -11,6 +11,7 @@ import ProjectManagerModal from './components/ProjectManagerModal';
 import ExportProgressModal from './components/ExportProgressModal';
 import BackgroundTaskBar from './components/BackgroundTaskBar';
 import ApiConnectorModal from './components/ApiConnectorModal';
+import AppLockScreen, { isStudioAuthenticated, lockStudio } from './components/AppLockScreen';
 
 import { ensureFontsReady, POSTER_THEMES, THEME_KEYS } from './utils/canvasRenderer';
 import { saveSlidesToFolder } from './utils/exportEngine';
@@ -103,6 +104,7 @@ export default function App() {
   const [isNewsOpen, setIsNewsOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isApiConnectorOpen, setIsApiConnectorOpen] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(() => isStudioAuthenticated());
   const [zipProgress, setZipProgress] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
 
@@ -881,6 +883,10 @@ export default function App() {
 
   const currentSlide = slides[currentIndex] || slides[0];
 
+  if (!isAuthenticated) {
+    return <AppLockScreen onUnlock={() => setIsAuthenticated(true)} />;
+  }
+
   return (
     <div className="studio-app-root">
       {/* Top Studio Header */}
@@ -897,6 +903,10 @@ export default function App() {
         onOpenGlobalSettings={handleOpenGlobalSettings}
         onOpenApiConnector={() => setIsApiConnectorOpen(true)}
         onOpenSettings={() => setIsSettingsOpen(true)}
+        onLockStudio={() => {
+          lockStudio();
+          setIsAuthenticated(false);
+        }}
         onSaveAllFrames={handleSaveAllFrames}
         onSaveCurrentFrame={handleSaveCurrentFrame}
         isSaving={zipProgress !== null}

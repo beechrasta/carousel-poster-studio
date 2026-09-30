@@ -20,6 +20,7 @@ import {
   FolderOutput,
   ImageDown,
   Code,
+  Lock,
 } from 'lucide-react';
 
 export default function Header({
@@ -35,6 +36,7 @@ export default function Header({
   onOpenGlobalSettings,
   onOpenApiConnector,
   onOpenSettings,
+  onLockStudio,
   onSaveCurrentFrame,   // saves single current slide to folder
   onSaveAllFrames,      // saves all slides to folder
   isSaving,             // bool: export in progress
@@ -205,6 +207,17 @@ export default function Header({
           <Settings size={14} />
           <span>Settings</span>
         </button>
+
+        {onLockStudio && (
+          <button 
+            className="btn btn-icon"
+            onClick={onLockStudio}
+            title="Lock Studio Access"
+          >
+            <Lock size={13} className="text-lime" />
+            <span>Lock</span>
+          </button>
+        )}
 
         {/* Actions Dropdown: Reset only */}
         <div className="relative" ref={actionsMenuRef} style={{ position: 'relative' }}>

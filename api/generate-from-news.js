@@ -8,6 +8,21 @@ Output format per story:
 HEADLINE: <text>
 SUBTEXT: <text>`;
 
+function cleanCopyText(str) {
+  if (!str) return '';
+  let s = String(str)
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/\*(.*?)\*/g, '$1')
+    .replace(/__(.*?)__/g, '$1')
+    .replace(/_(.*?)_/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/^[\*\#\-\•\>\s]+/gm, '')
+    .replace(/[\*\#\`]/g, '')
+    .trim();
+  s = s.replace(/^["'`“”\s]+|["'`“”\s]+$/g, '').trim();
+  return s;
+}
+
 function parseAiOutput(text) {
   const stories = [];
   const blocks = text.split(/(?=HEADLINE:)/i).filter(b => b.trim());
@@ -18,8 +33,8 @@ function parseAiOutput(text) {
 
     if (headMatch) {
       stories.push({
-        headline: headMatch[1].trim(),
-        subtext: subMatch ? subMatch[1].trim() : ''
+        headline: cleanCopyText(headMatch[1]),
+        subtext: cleanCopyText(subMatch ? subMatch[1] : '')
       });
     }
   }
@@ -184,10 +199,10 @@ export default async function handler(req, res) {
       }
 
       const slide = {
-        headline: story.headline.replace(/^\*+|\*+$/g, ''),
-        subtext: story.subtext,
+        headline: cleanCopyText(story.headline),
+        subtext: cleanCopyText(story.subtext),
         image: slideImg,
-        credit: story.credit || (slideImg?.includes('pollinations.ai') ? 'AI Generated' : ''),
+        credit: (story.credit && story.credit !== 'AI Generated') ? story.credit : '',
         frameLabel: `FRAME ${String(i + 1).padStart(2, '0')}`,
         theme,
         template
