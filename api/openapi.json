@@ -1,0 +1,333 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Carousel Poster Studio API",
+    "description": "High-performance API for generating 1080x1080 px social media carousel posters for Instagram & Threads with custom themes, punchy typography, and AI copywriting.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://carousel-poster-studio.vercel.app",
+      "description": "Production Vercel Server"
+    },
+    {
+      "url": "http://localhost:3000",
+      "description": "Local Development Server"
+    }
+  ],
+  "paths": {
+    "/api/render-poster": {
+      "post": {
+        "operationId": "renderSinglePoster",
+        "summary": "Render a single 1080x1080 px poster image",
+        "description": "Takes poster content (headline, roast subtext, image URL, theme, template) and renders an exact 1080x1080 px PNG image returned as a Base64 data URL or PNG binary.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SlideInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Poster generated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RenderSingleResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "renderPosterGet",
+        "summary": "Generate a poster directly via URL query parameters",
+        "parameters": [
+          {
+            "name": "headline",
+            "in": "query",
+            "required": true,
+            "description": "Main bold hook headline (under 10 words)",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "subtext",
+            "in": "query",
+            "required": false,
+            "description": "Punchy roast or summary subtext (2-4 lines)",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "image",
+            "in": "query",
+            "required": false,
+            "description": "Public image URL for the poster photo panel",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "theme",
+            "in": "query",
+            "required": false,
+            "description": "Color theme ID",
+            "schema": {
+              "type": "string",
+              "enum": ["dark_lime", "clean_light", "neon_cyber", "midnight_slate", "sunset_blaze", "emerald_matrix", "mono_stark"],
+              "default": "dark_lime"
+            }
+          },
+          {
+            "name": "template",
+            "in": "query",
+            "required": false,
+            "description": "Layout design template ID",
+            "schema": {
+              "type": "string",
+              "enum": ["classic_studio", "headline_first", "hero_fullbleed", "editorial_split", "card_frame", "minimal_quote"],
+              "default": "classic_studio"
+            }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "description": "Output format ('png' for binary image, 'json' for JSON response)",
+            "schema": {
+              "type": "string",
+              "enum": ["png", "json"],
+              "default": "png"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Rendered PNG image or JSON metadata",
+            "content": {
+              "image/png": {
+                "schema": { "type": "string", "format": "binary" }
+              },
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/RenderSingleResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/render-deck": {
+      "post": {
+        "operationId": "renderCarouselDeck",
+        "summary": "Render a full multi-slide carousel deck",
+        "description": "Renders an entire sequence of 1080x1080 px social media slides and returns all base64 images and slide metadata.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeckInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Carousel deck rendered successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeckResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/generate-from-news": {
+      "post": {
+        "operationId": "generateFromNews",
+        "summary": "Autonomous AI copy generation and poster rendering",
+        "description": "Takes raw news text or story bullets, writes punchy headlines and roast copy, pairs images, and renders complete 1080x1080 px posters.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "newsText": {
+                    "type": "string",
+                    "description": "Raw news articles, tech updates, or bullet points to turn into posters"
+                  },
+                  "images": {
+                    "type": "array",
+                    "items": { "type": "string" },
+                    "description": "Array of image URLs to pair with slides in order"
+                  },
+                  "theme": {
+                    "type": "string",
+                    "enum": ["dark_lime", "clean_light", "neon_cyber", "midnight_slate", "sunset_blaze", "emerald_matrix", "mono_stark"],
+                    "default": "dark_lime"
+                  },
+                  "template": {
+                    "type": "string",
+                    "enum": ["classic_studio", "headline_first", "hero_fullbleed", "editorial_split", "card_frame", "minimal_quote"],
+                    "default": "classic_studio"
+                  }
+                },
+                "required": ["newsText"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Generated slides and rendered images",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeckResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "SlideInput": {
+        "type": "object",
+        "properties": {
+          "headline": {
+            "type": "string",
+            "description": "Bold, punchy hook headline (under 10 words)",
+            "example": "OPENAI REVEALS GPT-5"
+          },
+          "subtext": {
+            "type": "string",
+            "description": "2-4 line witty roast or summary of the news story",
+            "example": "Claims AGI is achieved. Still struggles with counting the letter R in strawberry."
+          },
+          "image": {
+            "type": "string",
+            "description": "Public URL or Base64 data URL for the photo panel",
+            "example": "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe"
+          },
+          "credit": {
+            "type": "string",
+            "description": "Image source caption shown in bottom-left corner",
+            "example": "TechCrunch"
+          },
+          "frameLabel": {
+            "type": "string",
+            "description": "Header tag e.g. FRAME 01",
+            "example": "FRAME 01"
+          },
+          "theme": {
+            "type": "string",
+            "enum": ["dark_lime", "clean_light", "neon_cyber", "midnight_slate", "sunset_blaze", "emerald_matrix", "mono_stark"],
+            "default": "dark_lime"
+          },
+          "template": {
+            "type": "string",
+            "enum": ["classic_studio", "headline_first", "hero_fullbleed", "editorial_split", "card_frame", "minimal_quote"],
+            "default": "classic_studio"
+          },
+          "layout": {
+            "type": "string",
+            "enum": ["top_image", "full_bleed", "split_image", "dual_image", "text_only", "collage_3"],
+            "default": "top_image"
+          },
+          "watermarkText": {
+            "type": "string",
+            "description": "Brand watermark text or @handle",
+            "example": "@techdigest"
+          }
+        },
+        "required": ["headline"]
+      },
+      "DeckInput": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Project title"
+          },
+          "slides": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SlideInput"
+            }
+          },
+          "globalSettings": {
+            "type": "object",
+            "properties": {
+              "globalThemeId": { "type": "string", "default": "dark_lime" },
+              "globalTemplateId": { "type": "string", "default": "classic_studio" },
+              "watermarkText": { "type": "string" },
+              "watermarkEnabled": { "type": "boolean" }
+            }
+          }
+        },
+        "required": ["slides"]
+      },
+      "RenderSingleResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "example": true },
+          "dimensions": {
+            "type": "object",
+            "properties": {
+              "width": { "type": "integer", "example": 1080 },
+              "height": { "type": "integer", "example": 1080 }
+            }
+          },
+          "mimeType": { "type": "string", "example": "image/png" },
+          "image": { "type": "string", "description": "Base64 data URL string of the rendered 1080x1080 PNG poster" },
+          "slide": {
+            "type": "object",
+            "properties": {
+              "headline": { "type": "string" },
+              "subtext": { "type": "string" },
+              "theme": { "type": "string" },
+              "template": { "type": "string" }
+            }
+          }
+        }
+      },
+      "DeckResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "example": true },
+          "count": { "type": "integer", "example": 3 },
+          "dimensions": {
+            "type": "object",
+            "properties": {
+              "width": { "type": "integer", "example": 1080 },
+              "height": { "type": "integer", "example": 1080 }
+            }
+          },
+          "slides": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "index": { "type": "integer", "example": 1 },
+                "headline": { "type": "string" },
+                "subtext": { "type": "string" },
+                "frameLabel": { "type": "string" },
+                "image": { "type": "string", "description": "Base64 data URL of the rendered 1080x1080 PNG poster" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -178,6 +178,44 @@ export default defineConfig({
             res.end(JSON.stringify({ error: err.message }));
           });
         });
+
+        // OpenAPI Specification Route
+        server.middlewares.use('/api/openapi.json', async (req, res) => {
+          const fs = await import('fs');
+          const path = await import('path');
+          const specPath = path.join(process.cwd(), 'api', 'openapi.json');
+          if (fs.existsSync(specPath)) {
+            res.setHeader('Content-Type', 'application/json');
+            res.setHeader('Access-Control-Allow-Origin', '*');
+            res.end(fs.readFileSync(specPath, 'utf-8'));
+          } else {
+            res.statusCode = 404;
+            res.end(JSON.stringify({ error: 'Spec not found' }));
+          }
+        });
+
+        // Helper to forward requests to serverless API functions
+        const forwardToApi = async (modulePath, req, res) => {
+          let body = '';
+          req.on('data', chunk => body += chunk);
+          req.on('end', async () => {
+            try {
+              if (body) {
+                try { req.body = JSON.parse(body); } catch { req.body = body; }
+              }
+              const mod = await import(modulePath);
+              await mod.default(req, res);
+            } catch (err) {
+              res.statusCode = 500;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ error: err.message }));
+            }
+          });
+        };
+
+        server.middlewares.use('/api/render-poster', (req, res) => forwardToApi('./api/render-poster.js', req, res));
+        server.middlewares.use('/api/render-deck', (req, res) => forwardToApi('./api/render-deck.js', req, res));
+        server.middlewares.use('/api/generate-from-news', (req, res) => forwardToApi('./api/generate-from-news.js', req, res));
       }
     }
   ],

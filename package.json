@@ -7,9 +7,12 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "render:cli": "node scripts/generate.js",
+    "render:example": "node scripts/generate.js --file examples/carousel.json --out ./dist-posters"
   },
   "dependencies": {
+    "@napi-rs/canvas": "^1.0.9",
     "jszip": "^3.10.1",
     "lucide-react": "^0.475.0",
     "react": "^18.3.1",

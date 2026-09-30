@@ -1,0 +1,38 @@
+{
+  "title": "Weekly Tech Roast",
+  "globalSettings": {
+    "globalThemeId": "dark_lime",
+    "globalTemplateId": "classic_studio",
+    "watermarkText": "@techroast",
+    "watermarkEnabled": true
+  },
+  "slides": [
+    {
+      "headline": "OPENAI RELEASES GPT-5",
+      "subtext": "Claims AGI is achieved. Still struggles with counting the letter R in strawberry.",
+      "image": "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe",
+      "credit": "TechCrunch",
+      "frameLabel": "FRAME 01",
+      "theme": "dark_lime",
+      "template": "classic_studio"
+    },
+    {
+      "headline": "NVIDIA UNVEILS $500B CHIP",
+      "subtext": "Requires its own nuclear power station and costs more than a downtown penthouse.",
+      "image": "https://images.unsplash.com/photo-1518770660439-4636190af475",
+      "credit": "Reuters",
+      "frameLabel": "FRAME 02",
+      "theme": "neon_cyber",
+      "template": "headline_first"
+    },
+    {
+      "headline": "ROBOTS PASS BAR EXAM",
+      "subtext": "Immediately charges $850 per hour for 15-minute consultations.",
+      "image": "https://images.unsplash.com/photo-1485827404703-89b55fcc595e",
+      "credit": "The Verge",
+      "frameLabel": "FRAME 03",
+      "theme": "midnight_slate",
+      "template": "editorial_split"
+    }
+  ]
+}

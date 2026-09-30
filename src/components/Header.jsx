@@ -19,6 +19,7 @@ import {
   SlidersHorizontal,
   FolderOutput,
   ImageDown,
+  Code,
 } from 'lucide-react';
 
 export default function Header({
@@ -32,6 +33,7 @@ export default function Header({
   onOpenBatchBuilder,
   onOpenNewsGenerator,
   onOpenGlobalSettings,
+  onOpenApiConnector,
   onOpenSettings,
   onSaveCurrentFrame,   // saves single current slide to folder
   onSaveAllFrames,      // saves all slides to folder
@@ -172,6 +174,15 @@ export default function Header({
             <span>Bulk Deck Settings</span>
           </button>
         )}
+
+        <button 
+          className="btn btn-secondary btn-sm"
+          onClick={onOpenApiConnector}
+          title="API & ChatGPT Connector (OpenAPI, Vercel, cURL)"
+        >
+          <Code size={13} className="text-lime" />
+          <span>API &amp; GPT</span>
+        </button>
       </div>
 
       {/* Right Section: Theme Toggle, Settings, Actions Dropdown & Save Frames */}

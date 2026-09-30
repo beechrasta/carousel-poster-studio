@@ -10,6 +10,7 @@ import SettingsModal from './components/SettingsModal';
 import ProjectManagerModal from './components/ProjectManagerModal';
 import ExportProgressModal from './components/ExportProgressModal';
 import BackgroundTaskBar from './components/BackgroundTaskBar';
+import ApiConnectorModal from './components/ApiConnectorModal';
 
 import { ensureFontsReady, POSTER_THEMES, THEME_KEYS } from './utils/canvasRenderer';
 import { saveSlidesToFolder } from './utils/exportEngine';
@@ -101,6 +102,7 @@ export default function App() {
   const [isBatchOpen, setIsBatchOpen] = useState(false);
   const [isNewsOpen, setIsNewsOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isApiConnectorOpen, setIsApiConnectorOpen] = useState(false);
   const [zipProgress, setZipProgress] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
 
@@ -893,6 +895,7 @@ export default function App() {
         onOpenBatchBuilder={() => setIsBatchOpen(true)}
         onOpenNewsGenerator={() => setIsNewsOpen(true)}
         onOpenGlobalSettings={handleOpenGlobalSettings}
+        onOpenApiConnector={() => setIsApiConnectorOpen(true)}
         onOpenSettings={() => setIsSettingsOpen(true)}
         onSaveAllFrames={handleSaveAllFrames}
         onSaveCurrentFrame={handleSaveCurrentFrame}
@@ -1028,6 +1031,12 @@ export default function App() {
         settings={settings}
         onSaveSettings={setSettings}
         showToast={showToast}
+      />
+
+      {/* API & ChatGPT Connector Modal */}
+      <ApiConnectorModal 
+        isOpen={isApiConnectorOpen}
+        onClose={() => setIsApiConnectorOpen(false)}
       />
 
       {/* ZIP Export Progress Modal */}
