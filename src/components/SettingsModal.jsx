@@ -15,7 +15,8 @@ import {
   ChevronDown,
   ExternalLink,
   Tag,
-  SlidersHorizontal
+  SlidersHorizontal,
+  Image as ImageIcon
 } from 'lucide-react';
 import { 
   checkOpencodeStatus, 
@@ -24,6 +25,7 @@ import {
   fetchOllamaModels, 
   fetchOpenAICompatibleModels 
 } from '../utils/apiServices';
+import { getUnsplashKey, setUnsplashKey, testUnsplashKey } from '../utils/unsplash';
 
 export default function SettingsModal({
   isOpen,
@@ -57,10 +59,17 @@ export default function SettingsModal({
   const [isFetchingDirectModels, setIsFetchingDirectModels] = useState(false);
   const [directModelsList, setDirectModelsList] = useState([]);
 
+  // Unsplash Image Engine State
+  const [unsplashKeyDraft, setUnsplashKeyDraft] = useState(() => getUnsplashKey());
+  const [isTestingUnsplash, setIsTestingUnsplash] = useState(false);
+  const [unsplashTestResult, setUnsplashTestResult] = useState(null);
+
   useEffect(() => {
     if (isOpen) {
       setFormData({ ...settings });
       setTestResult(null);
+      setUnsplashKeyDraft(getUnsplashKey());
+      setUnsplashTestResult(null);
     }
   }, [isOpen, settings]);
 
@@ -153,10 +162,28 @@ export default function SettingsModal({
     }
   };
 
+  const handleTestUnsplash = async () => {
+    setIsTestingUnsplash(true);
+    setUnsplashTestResult(null);
+    try {
+      const res = await testUnsplashKey(unsplashKeyDraft);
+      if (res.ok) {
+        setUnsplashTestResult({ success: true, message: `Unsplash API key is active & verified! (${res.rateLimit})` });
+      } else {
+        setUnsplashTestResult({ success: false, message: `Unsplash test failed: ${res.error}` });
+      }
+    } catch (err) {
+      setUnsplashTestResult({ success: false, message: err.message });
+    } finally {
+      setIsTestingUnsplash(false);
+    }
+  };
+
   const handleSave = () => {
+    setUnsplashKey(unsplashKeyDraft);
     onSaveSettings(formData);
     onClose();
-    showToast('AI / LLM Settings saved.');
+    showToast('AI and Unsplash Settings saved.');
   };
 
   // Filtered Opencode Models
@@ -492,13 +519,62 @@ export default function SettingsModal({
               disabled={isTesting}
             >
               {isTesting ? <RefreshCw size={13} className="animate-spin" /> : null}
-              <span>Test Connection</span>
+              <span>Test AI Connection</span>
             </button>
 
             {testResult && (
               <div className={`connection-test-feedback mt-2 ${testResult.success ? 'success' : 'error'}`}>
                 {testResult.success ? <Check size={14} className="text-lime" /> : <AlertCircle size={14} />}
                 <span>{testResult.message}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Unsplash Image API & Media Provider */}
+          <div className="pt-4 border-t border-border space-y-3">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <ImageIcon size={16} className="text-lime" />
+                <label className="input-label font-semibold mb-0">Unsplash Image API (High-Res Photos)</label>
+              </div>
+              <a 
+                href="https://unsplash.com/developers" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="text-xs text-accent flex items-center gap-1 hover:underline"
+              >
+                <span>Unsplash Portal</span>
+                <ExternalLink size={10} />
+              </a>
+            </div>
+            <p className="text-xs text-muted">
+              Powers the Slide Image Picker to search 5M+ high-resolution editorial photos by keyword.
+            </p>
+            <div className="input-group">
+              <label className="input-label text-xs">Unsplash Access Key (Client-ID)</label>
+              <input 
+                type="password" 
+                className="text-input text-xs font-mono"
+                placeholder="e.g. q_3KHZSWrHh3eS8Rn5SVvmtK2PINDVB95qsWAKyZyjo"
+                value={unsplashKeyDraft}
+                onChange={(e) => setUnsplashKeyDraft(e.target.value)}
+              />
+            </div>
+            <div className="flex gap-2 items-center">
+              <button 
+                type="button" 
+                className="btn btn-secondary btn-xs flex items-center gap-1.5"
+                onClick={handleTestUnsplash}
+                disabled={isTestingUnsplash}
+              >
+                {isTestingUnsplash ? <RefreshCw size={11} className="animate-spin" /> : <Zap size={11} className="text-lime" />}
+                <span>{isTestingUnsplash ? 'Testing API...' : 'Test Unsplash Key'}</span>
+              </button>
+            </div>
+            {unsplashTestResult && (
+              <div className={`connection-test-feedback ${unsplashTestResult.success ? 'success' : 'error'}`}>
+                {unsplashTestResult.success ? <Check size={14} className="text-lime" /> : <AlertCircle size={14} />}
+                <span>{unsplashTestResult.message}</span>
               </div>
             )}
           </div>

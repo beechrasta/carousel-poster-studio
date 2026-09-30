@@ -4,7 +4,7 @@ import {
   Loader2, Image as ImageIcon, RefreshCw, ExternalLink,
   ChevronLeft, ChevronRight, KeyRound
 } from 'lucide-react';
-import { searchUnsplash, extractKeywordsFromSlide, getUnsplashKey, setUnsplashKey } from '../utils/unsplash';
+import { searchUnsplash, extractKeywordsFromSlide, getUnsplashKey, setUnsplashKey, trackUnsplashDownload } from '../utils/unsplash';
 import { fileToDataURL, urlToDataURL } from '../utils/exportEngine';
 
 /**
@@ -86,6 +86,9 @@ export default function ImagePickerModal({ isOpen, onClose, onSelect, slide, slo
 
   const handleConfirmPhoto = async () => {
     if (!selectedPhoto) return;
+    if (selectedPhoto.downloadLocation) {
+      trackUnsplashDownload(selectedPhoto.downloadLocation);
+    }
     // Proxy via the regular URL directly - Unsplash allows hotlinking with credit
     const credit = `${selectedPhoto.author} / Unsplash`;
     onSelect(selectedPhoto.url_regular, credit);

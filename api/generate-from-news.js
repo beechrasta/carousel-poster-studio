@@ -185,17 +185,43 @@ export default async function handler(req, res) {
       const story = parsedStories[i];
       let slideImg = images[i] || (images.length === 1 ? images[0] : null);
 
-      // If no image passed and autoImage is not disabled, generate relevant AI photo
+      // If no image passed and autoImage is not disabled, fetch relevant Unsplash photo or generate AI photo
       if (!slideImg && body.autoImage !== false) {
+        const unsplashAccessKey = process.env.UNSPLASH_ACCESS_KEY || process.env.UNSPLASH_KEY || 'q_3KHZSWrHh3eS8Rn5SVvmtK2PINDVB95qsWAKyZyjo';
         const cleanKeywords = String(story.headline || 'artificial intelligence technology')
           .replace(/[\*\#\_\`\:\–\—]/g, '')
           .replace(/[^\w\s]/gi, '')
           .trim()
           .split(/\s+/)
-          .slice(0, 6)
+          .slice(0, 5)
           .join(' ');
-        const prompt = encodeURIComponent(`${cleanKeywords} modern tech editorial photograph cinematic lighting`);
-        slideImg = `https://image.pollinations.ai/prompt/${prompt}?width=1200&height=675&nologo=true&seed=${i * 17 + 101}`;
+
+        if (unsplashAccessKey) {
+          try {
+            const uRes = await fetch(`https://api.unsplash.com/search/photos?query=${encodeURIComponent(cleanKeywords)}&per_page=1&orientation=squarish`, {
+              headers: { 
+                'Authorization': `Client-ID ${unsplashAccessKey}`,
+                'Accept-Version': 'v1'
+              }
+            });
+            if (uRes.ok) {
+              const uData = await uRes.json();
+              if (uData.results && uData.results[0]) {
+                slideImg = uData.results[0].urls?.regular || uData.results[0].urls?.full;
+                if (!story.credit && uData.results[0].user?.name) {
+                  story.credit = `${uData.results[0].user.name} / Unsplash`;
+                }
+              }
+            }
+          } catch (e) {
+            console.warn('Server Unsplash photo fetch fallback to Pollinations:', e.message);
+          }
+        }
+
+        if (!slideImg) {
+          const prompt = encodeURIComponent(`${cleanKeywords} modern tech editorial photograph cinematic lighting`);
+          slideImg = `https://image.pollinations.ai/prompt/${prompt}?width=1200&height=675&nologo=true&seed=${i * 17 + 101}`;
+        }
       }
 
       const slide = {

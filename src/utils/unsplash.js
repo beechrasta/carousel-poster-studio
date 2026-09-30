@@ -1,23 +1,85 @@
 /**
  * Unsplash & Curated Image Search Utility
- * Supports Unsplash API (with client key) and smart curated photo feeds with
+ * Supports Unsplash API (with Client Access Key) and smart curated photo feeds with
  * keyword-targeted images so users ALWAYS get relevant photos without needing an API key.
  */
 
 const STORAGE_KEY_UNSPLASH = 'cps-unsplash-key';
 const UNSPLASH_API = 'https://api.unsplash.com';
 
+// Built-in default Unsplash Access Key fallback
+export const DEFAULT_UNSPLASH_KEY = 'q_3KHZSWrHh3eS8Rn5SVvmtK2PINDVB95qsWAKyZyjo';
+
 export function getUnsplashKey() {
   try {
-    return localStorage.getItem(STORAGE_KEY_UNSPLASH) || '';
-  } catch {
-    return '';
-  }
+    const saved = localStorage.getItem(STORAGE_KEY_UNSPLASH);
+    if (saved && saved.trim()) return saved.trim();
+  } catch {}
+
+  // Fallback to Vite env variables or default key
+  try {
+    if (typeof import.meta !== 'undefined' && import.meta.env) {
+      if (import.meta.env.VITE_UNSPLASH_ACCESS_KEY) return import.meta.env.VITE_UNSPLASH_ACCESS_KEY.trim();
+      if (import.meta.env.UNSPLASH_ACCESS_KEY) return import.meta.env.UNSPLASH_ACCESS_KEY.trim();
+    }
+  } catch {}
+
+  return DEFAULT_UNSPLASH_KEY;
 }
 
 export function setUnsplashKey(key) {
   try {
-    localStorage.setItem(STORAGE_KEY_UNSPLASH, key);
+    if (key && key.trim()) {
+      localStorage.setItem(STORAGE_KEY_UNSPLASH, key.trim());
+    } else {
+      localStorage.removeItem(STORAGE_KEY_UNSPLASH);
+    }
+  } catch {}
+}
+
+/**
+ * Tests an Unsplash Access Key to verify if it is valid and check rate limits.
+ */
+export async function testUnsplashKey(key) {
+  const targetKey = key || getUnsplashKey();
+  if (!targetKey) {
+    return { ok: false, error: 'No Unsplash Access Key provided.' };
+  }
+
+  try {
+    const res = await fetch(`${UNSPLASH_API}/photos?per_page=1`, {
+      headers: {
+        'Authorization': `Client-ID ${targetKey}`,
+        'Accept-Version': 'v1'
+      }
+    });
+
+    if (res.ok) {
+      const remaining = res.headers.get('X-Ratelimit-Remaining') || '50';
+      const limit = res.headers.get('X-Ratelimit-Limit') || '50';
+      return { ok: true, rateLimit: `${remaining}/${limit} requests remaining this hour` };
+    } else {
+      const errData = await res.json().catch(() => ({}));
+      const msg = Array.isArray(errData.errors) ? errData.errors.join(', ') : (errData.error || res.statusText);
+      return { ok: false, error: msg || `HTTP ${res.status}` };
+    }
+  } catch (err) {
+    return { ok: false, error: err.message || 'Network error connecting to Unsplash.' };
+  }
+}
+
+/**
+ * Trigger Unsplash download endpoint per official API developer guidelines.
+ */
+export async function trackUnsplashDownload(downloadLocation) {
+  if (!downloadLocation) return;
+  const key = getUnsplashKey();
+  if (!key) return;
+
+  try {
+    await fetch(downloadLocation, {
+      headers: { 'Authorization': `Client-ID ${key}` }
+    });
   } catch {}
 }
 
@@ -77,14 +139,17 @@ const CURATED_TECH_PHOTOS = [
 /**
  * Searches Unsplash for photos matching a query.
  */
-export async function searchUnsplash(query, page = 1, perPage = 15) {
+export async function searchUnsplash(query, page = 1, perPage = 18) {
   const key = getUnsplashKey();
 
   if (key) {
     try {
       const url = `${UNSPLASH_API}/search/photos?query=${encodeURIComponent(query)}&page=${page}&per_page=${perPage}&orientation=squarish`;
       const res = await fetch(url, {
-        headers: { Authorization: `Client-ID ${key}` }
+        headers: { 
+          'Authorization': `Client-ID ${key}`,
+          'Accept-Version': 'v1'
+        }
       });
 
       if (res.ok) {
@@ -96,11 +161,14 @@ export async function searchUnsplash(query, page = 1, perPage = 15) {
             url_regular: photo.urls?.regular,
             url_full: photo.urls?.full,
             author: photo.user?.name || 'Unsplash',
-            authorUrl: photo.user?.links?.html || 'https://unsplash.com',
+            authorUrl: photo.user?.links?.html ? `${photo.user.links.html}?utm_source=carousel_poster_studio&utm_medium=referral` : 'https://unsplash.com',
+            downloadLocation: photo.links?.download_location,
             color: photo.color || '#1a1a1a',
             alt: photo.alt_description || photo.description || query,
           }));
         }
+      } else {
+        console.warn(`Unsplash API responded with ${res.status}: falling back to curated feed.`);
       }
     } catch (err) {
       console.warn('Unsplash API search failed, falling back to curated images:', err.message);
@@ -111,9 +179,9 @@ export async function searchUnsplash(query, page = 1, perPage = 15) {
   const cleanQuery = encodeURIComponent(query.trim() || 'technology news');
   const photos = [];
 
-  // Generate 8 dynamic keyword-matching photos via AI image generator
-  for (let i = 0; i < 8; i++) {
-    const seed = (page - 1) * 8 + i + 10;
+  // Generate 9 dynamic keyword-matching photos via AI image generator
+  for (let i = 0; i < 9; i++) {
+    const seed = (page - 1) * 9 + i + 10;
     const aiUrl = `https://image.pollinations.ai/prompt/${cleanQuery}%20modern%20editorial%20photo%20cinematic?width=800&height=800&nologo=true&seed=${seed}`;
     photos.push({
       id: `ai_${seed}`,
@@ -127,8 +195,8 @@ export async function searchUnsplash(query, page = 1, perPage = 15) {
     });
   }
 
-  // Add 8 curated high-resolution real Unsplash photos
-  for (let i = 0; i < Math.min(perPage - 8, CURATED_TECH_PHOTOS.length); i++) {
+  // Add 9 curated high-resolution real Unsplash photos
+  for (let i = 0; i < Math.min(perPage - 9, CURATED_TECH_PHOTOS.length); i++) {
     const item = CURATED_TECH_PHOTOS[(i + (page - 1) * 4) % CURATED_TECH_PHOTOS.length];
     photos.push({
       id: `${item.id}_${page}`,
