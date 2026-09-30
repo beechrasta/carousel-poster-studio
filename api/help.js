@@ -89,7 +89,9 @@ export default async function handler(req, res) {
     ]
   };
 
+  const jsonStr = JSON.stringify(helpDoc, null, 2);
   res.statusCode = 200;
   res.setHeader('Content-Type', 'application/json');
-  res.end(JSON.stringify(helpDoc, null, 2));
+  res.setHeader('Content-Length', Buffer.byteLength(jsonStr));
+  res.end(jsonStr);
 }

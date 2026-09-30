@@ -1,4 +1,5 @@
 import { renderSlideServer } from './lib/serverRenderer.js';
+import { resolveSlideImage } from './lib/serverImageHelper.js';
 
 const SYSTEM_PROMPT = `You write carousel-poster copy about AI and tech news. For EACH story produce exactly:
 HEADLINE: under 10 words, bold, funny, attention-grabbing. No em dashes, no corporate speak.
@@ -184,51 +185,23 @@ export default async function handler(req, res) {
     for (let i = 0; i < totalSlides; i++) {
       const story = parsedStories[i];
       let slideImg = images[i] || (images.length === 1 ? images[0] : null);
+      let slideCredit = story.credit || '';
 
-      // If no image passed and autoImage is not disabled, fetch relevant Unsplash photo or generate AI photo
       if (!slideImg && body.autoImage !== false) {
-        const unsplashAccessKey = process.env.UNSPLASH_ACCESS_KEY || process.env.UNSPLASH_KEY || 'q_3KHZSWrHh3eS8Rn5SVvmtK2PINDVB95qsWAKyZyjo';
-        const cleanKeywords = String(story.headline || 'artificial intelligence technology')
-          .replace(/[\*\#\_\`\:\–\—]/g, '')
-          .replace(/[^\w\s]/gi, '')
-          .trim()
-          .split(/\s+/)
-          .slice(0, 5)
-          .join(' ');
-
-        if (unsplashAccessKey) {
-          try {
-            const uRes = await fetch(`https://api.unsplash.com/search/photos?query=${encodeURIComponent(cleanKeywords)}&per_page=1&orientation=squarish`, {
-              headers: { 
-                'Authorization': `Client-ID ${unsplashAccessKey}`,
-                'Accept-Version': 'v1'
-              }
-            });
-            if (uRes.ok) {
-              const uData = await uRes.json();
-              if (uData.results && uData.results[0]) {
-                slideImg = uData.results[0].urls?.regular || uData.results[0].urls?.full;
-                if (!story.credit && uData.results[0].user?.name) {
-                  story.credit = `${uData.results[0].user.name} / Unsplash`;
-                }
-              }
-            }
-          } catch (e) {
-            console.warn('Server Unsplash photo fetch fallback to Pollinations:', e.message);
-          }
-        }
-
-        if (!slideImg) {
-          const prompt = encodeURIComponent(`${cleanKeywords} modern tech editorial photograph cinematic lighting`);
-          slideImg = `https://image.pollinations.ai/prompt/${prompt}?width=1200&height=675&nologo=true&seed=${i * 17 + 101}`;
-        }
+        const imgInfo = await resolveSlideImage({
+          headline: story.headline,
+          subtext: story.subtext,
+          credit: story.credit
+        }, i, true);
+        slideImg = imgInfo.image;
+        slideCredit = imgInfo.credit;
       }
 
       const slide = {
         headline: cleanCopyText(story.headline),
         subtext: cleanCopyText(story.subtext),
         image: slideImg,
-        credit: (story.credit && story.credit !== 'AI Generated') ? story.credit : '',
+        credit: slideCredit,
         frameLabel: `FRAME ${String(i + 1).padStart(2, '0')}`,
         theme,
         template
@@ -242,25 +215,31 @@ export default async function handler(req, res) {
         index: i + 1,
         headline: slide.headline,
         subtext: slide.subtext,
+        credit: slide.credit,
         frameLabel: slide.frameLabel,
         image: base64Png,
         sizeBytes: pngBuffer.length
       });
     }
 
-    res.statusCode = 200;
-    res.setHeader('Content-Type', 'application/json');
-    res.end(JSON.stringify({
+    const resPayload = JSON.stringify({
       success: true,
       count: renderedSlides.length,
       theme,
       template,
       slides: renderedSlides
-    }));
+    });
+
+    res.statusCode = 200;
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Length', Buffer.byteLength(resPayload));
+    res.end(resPayload);
   } catch (error) {
     console.error('Error in generate-from-news:', error);
+    const errPayload = JSON.stringify({ success: false, error: error.message });
     res.statusCode = 500;
     res.setHeader('Content-Type', 'application/json');
-    res.end(JSON.stringify({ success: false, error: error.message }));
+    res.setHeader('Content-Length', Buffer.byteLength(errPayload));
+    res.end(errPayload);
   }
 }

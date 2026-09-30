@@ -1,4 +1,5 @@
 import { renderSlideServer } from './lib/serverRenderer.js';
+import { resolveSlideImage } from './lib/serverImageHelper.js';
 
 export default async function handler(req, res) {
   // CORS Headers
@@ -16,11 +17,13 @@ export default async function handler(req, res) {
     let slide = {};
     let globalSettings = {};
     let format = 'json';
+    let autoImage = true;
 
     if (req.method === 'GET') {
       const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
       const q = Object.fromEntries(url.searchParams.entries());
       format = q.format || 'png';
+      autoImage = q.autoImage !== 'false';
       slide = {
         headline: q.headline || 'NO HEADLINE PROVIDED',
         subtext: q.subtext || '',
@@ -46,11 +49,23 @@ export default async function handler(req, res) {
       slide = body.slide || body;
       globalSettings = body.globalSettings || {};
       format = body.format || req.query?.format || 'json';
+      autoImage = body.autoImage !== false;
     } else {
+      const errJson = JSON.stringify({ error: 'Method not allowed. Use GET or POST.' });
       res.statusCode = 405;
       res.setHeader('Content-Type', 'application/json');
-      res.end(JSON.stringify({ error: 'Method not allowed. Use GET or POST.' }));
+      res.setHeader('Content-Length', Buffer.byteLength(errJson));
+      res.end(errJson);
       return;
+    }
+
+    // Auto-resolve image & attribution if no image provided
+    const imgInfo = await resolveSlideImage(slide, 0, autoImage);
+    if (imgInfo.image) {
+      slide.image = imgInfo.image;
+      if (!slide.credit && imgInfo.credit) {
+        slide.credit = imgInfo.credit;
+      }
     }
 
     const canvas = await renderSlideServer(slide, 0, globalSettings, 1);
@@ -66,9 +81,7 @@ export default async function handler(req, res) {
     }
 
     const base64Png = `data:image/png;base64,${pngBuffer.toString('base64')}`;
-    res.statusCode = 200;
-    res.setHeader('Content-Type', 'application/json');
-    res.end(JSON.stringify({
+    const resPayload = JSON.stringify({
       success: true,
       dimensions: { width: 1080, height: 1080 },
       mimeType: 'image/png',
@@ -77,17 +90,25 @@ export default async function handler(req, res) {
       slide: {
         headline: slide.headline,
         subtext: slide.subtext,
+        credit: slide.credit || '',
         theme: slide.theme || 'dark_lime',
         template: slide.template || 'classic_studio',
       }
-    }));
+    });
+
+    res.statusCode = 200;
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Length', Buffer.byteLength(resPayload));
+    res.end(resPayload);
   } catch (error) {
     console.error('Error in render-poster API:', error);
-    res.statusCode = 500;
-    res.setHeader('Content-Type', 'application/json');
-    res.end(JSON.stringify({
+    const errPayload = JSON.stringify({
       success: false,
       error: error.message || 'Failed to render poster'
-    }));
+    });
+    res.statusCode = 500;
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Length', Buffer.byteLength(errPayload));
+    res.end(errPayload);
   }
 }
