@@ -23,7 +23,11 @@
   "rewrites": [
     {
       "source": "/api/openapi.json",
-      "destination": "/api/openapi.json"
+      "destination": "/openapi.json"
+    },
+    {
+      "source": "/api/help",
+      "destination": "/api/help"
     },
     {
       "source": "/api/(.*)",
