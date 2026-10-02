@@ -1,5 +1,6 @@
 import { renderSlideServer } from './lib/serverRenderer.js';
 import { resolveSlideImage } from './lib/serverImageHelper.js';
+import { normalizeApiFrameLabel } from './lib/apiSlide.js';
 
 export default async function handler(req, res) {
   // CORS Headers
@@ -46,7 +47,8 @@ export default async function handler(req, res) {
     const renderedSlides = [];
 
     for (let i = 0; i < totalSlides; i++) {
-      const slide = slides[i];
+      // Never invent a frame badge the caller didn't ask for (issue #1).
+      const slide = normalizeApiFrameLabel(slides[i]);
 
       // Auto-resolve image & attribution if no image provided on this slide
       const imgInfo = await resolveSlideImage(slide, i, autoImage);
