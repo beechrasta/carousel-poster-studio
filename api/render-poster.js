@@ -1,5 +1,6 @@
 import { renderSlideServer } from './lib/serverRenderer.js';
 import { resolveSlideImage } from './lib/serverImageHelper.js';
+import { normalizeApiFrameLabel } from './lib/apiSlide.js';
 
 export default async function handler(req, res) {
   // CORS Headers
@@ -29,7 +30,7 @@ export default async function handler(req, res) {
         subtext: q.subtext || '',
         image: q.image || '',
         credit: q.credit || '',
-        frameLabel: q.frameLabel || q.frame || 'FRAME 01',
+        frameLabel: q.frameLabel ?? q.frame ?? '',
         theme: q.theme || 'dark_lime',
         template: q.template || 'classic_studio',
         layout: q.layout || 'top_image',
@@ -58,6 +59,10 @@ export default async function handler(req, res) {
       res.end(errJson);
       return;
     }
+
+    // Never invent a frame badge the caller didn't ask for (issue #1):
+    // an omitted or blank frameLabel renders no badge.
+    slide = normalizeApiFrameLabel(slide);
 
     // Auto-resolve image & attribution if no image provided
     const imgInfo = await resolveSlideImage(slide, 0, autoImage);
