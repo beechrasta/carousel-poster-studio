@@ -28,7 +28,7 @@ export default async function handler(req, res) {
           subtext: { type: "string", required: false, description: "Punchy roast or summary (2-4 lines)" },
           image: { type: "string (URL or Base64)", required: false, description: "Image for the top photo panel" },
           credit: { type: "string", required: false, description: "Source credit shown in bottom left (e.g. 'TechCrunch')" },
-          frameLabel: { type: "string", required: false, default: "FRAME 01", description: "Header badge text" },
+          frameLabel: { type: "string", required: false, description: "Header badge text. Omit or pass an empty string to render no badge." },
           theme: { type: "string", required: false, default: "dark_lime", options: ["dark_lime", "clean_light", "neon_cyber", "midnight_slate", "sunset_blaze", "emerald_matrix", "mono_stark"] },
           template: { type: "string", required: false, default: "classic_studio", options: ["classic_studio", "headline_first", "hero_fullbleed", "editorial_split", "card_frame", "minimal_quote"] },
           layout: { type: "string", required: false, default: "top_image", options: ["top_image", "full_bleed", "split_image", "dual_image", "text_only", "collage_3"] },
